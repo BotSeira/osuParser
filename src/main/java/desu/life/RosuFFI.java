@@ -1,4 +1,4 @@
-package life;
+package desu.life;
 
 import com.sun.jna.Memory;
 import com.sun.jna.Native;
