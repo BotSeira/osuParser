@@ -15,7 +15,7 @@ import java.util.LinkedList;
 public class OsuParser {
     private static final Gson GSON = new Gson();
 
-    public static DiffSpec getDiffSpecForMap(BeatmapExtended beatmap, Path beatmapFile, String mod) throws RosuFFI.FFIException {
+    public static DiffSpec getDiffSpecForMap(BeatmapExtended beatmap, Path beatmapFile, String mod) {
         try (final RosuFFI.Beatmap rosuBeatmap = new RosuFFI.Beatmap(beatmapFile.toAbsolutePath().toString());
              final RosuFFI.Performance perf = new RosuFFI.Performance()
         ) {
@@ -123,10 +123,12 @@ public class OsuParser {
             diffSpec.setMaxCombo(scoreState.max_combo);
 
             return diffSpec;
+        } catch (RosuFFI.FFIException e) {
+            throw new RuntimeException(e);
         }
     }
 
-    public static double estimatePp(Score score, String rosuPath) throws RosuFFI.FFIException {
+    public static double estimatePp(Score score, String rosuPath) {
         try (final RosuFFI.Beatmap rosuBeatmap = new RosuFFI.Beatmap(rosuPath);
              final RosuFFI.Performance perf = new RosuFFI.Performance()
         ) {
@@ -141,6 +143,8 @@ public class OsuParser {
             var calc = perf.calculate(rosuBeatmap);
 
             return calc.osu.t.pp;
+        } catch (RosuFFI.FFIException e) {
+            throw new RuntimeException(e);
         }
     }
 }
