@@ -15,6 +15,14 @@ import java.util.LinkedList;
 public class OsuParser {
     private static final Gson GSON = new Gson();
 
+    public static void initialize() {
+        try {
+            new RosuFFI.Beatmap(new byte[0]).close();
+        } catch (RosuFFI.FFIException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public static DiffSpec getDiffSpecForMap(BeatmapExtended beatmap, Path beatmapFile, String mod) {
         try (final RosuFFI.Beatmap rosuBeatmap = new RosuFFI.Beatmap(beatmapFile.toAbsolutePath().toString());
              final RosuFFI.Performance perf = new RosuFFI.Performance()
