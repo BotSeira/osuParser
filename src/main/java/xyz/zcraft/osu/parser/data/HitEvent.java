@@ -17,6 +17,9 @@ public record HitEvent(
             double distance,
             double angleFromLast
     ) {
+        public AimBias standardize() {
+            return new AimBias(theta - angleFromLast, distance, 0.0);
+        }
     }
 
     public enum HitResult {

@@ -146,6 +146,19 @@ public class ReplayAnalyzer {
 
                         consumedFrames[fi] = true;
                         break;
+                    } else {
+                        if (aimBias == null || aimBias.distance() > distance) {
+                            double theta = Math.atan2(dy, dx);
+                            double angleFromLast = theta;
+
+                            if (objIndex > 0) {
+                                double lastX = hitObjects.get(objIndex - 1).getX();
+                                double lastY = hitObjects.get(objIndex - 1).getY();
+                                angleFromLast = Math.atan2(hitObject.getY() - lastY, hitObject.getX() - lastX);
+                            }
+
+                            aimBias = new HitEvent.AimBias(theta, distance, angleFromLast);
+                        }
                     }
                 }
             }
