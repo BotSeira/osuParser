@@ -22,13 +22,44 @@ public class ReplayAnalyzer {
             throw new ParseException("Beatmap hash mismatch");
         }
 
-        applyStackLeniency(beatmap.getHitObjects(), beatmap.getCs(), beatmap.getAr(), beatmap.getStackLeniency());
+        boolean hasEZ = (replay.mods() & 2) > 0;
+        boolean hasHR = (replay.mods() & 16) > 0;
+        boolean hasDT = (replay.mods() & 64) > 0;
+        boolean hasHT = (replay.mods() & 256) > 0;
+        boolean hasNC = (replay.mods() & 512) > 0;
 
-        final double circleRadius = 54.4 - 4.48 * beatmap.getCs();
+        double cs = beatmap.getCs();
+        double od = beatmap.getOd();
+        double ar = beatmap.getAr();
 
-        final double hitWindow = 200 - 10 * beatmap.getOd(); // 50 (MEH)
-        final double hitWindowOk = 140 - 8 * beatmap.getOd(); // 100 (OK)
-        final double hitWindowPf = 80 - 6 * beatmap.getOd(); // 300 (PERFECT)
+        if (hasHR) {
+            cs = Math.min(10.0, cs * 1.3);
+            od = Math.min(10.0, od * 1.4);
+            ar = Math.min(10.0, ar * 1.4);
+        } else if (hasEZ) {
+            cs = cs * 0.5;
+            od = od * 0.5;
+            ar = ar * 0.5;
+        }
+
+        final double circleRadius = 54.4 - 4.48 * cs;
+
+        double hitWindow = 200 - 10 * od; // 50 (MEH)
+        double hitWindowOk = 140 - 8 * od; // 100 (OK)
+        double hitWindowPf = 80 - 6 * od; // 300 (PERFECT)
+
+        double clockRate = 1.0;
+        if (hasDT || hasNC) {
+            clockRate = 1.5;
+        } else if (hasHT) {
+            clockRate = 0.75;
+        }
+
+        hitWindow /= clockRate;
+        hitWindowOk /= clockRate;
+        hitWindowPf /= clockRate;
+
+        applyStackLeniency(beatmap.getHitObjects(), cs, ar, beatmap.getStackLeniency());
 
         final int n = keyFrames.size();
         long[] cumulative = new long[n];
@@ -113,7 +144,6 @@ public class ReplayAnalyzer {
                         foundFrameIndex = fi;
                         foundKeyFlags = currentFlags;
 
-                        // Mark this specific frame as consumed
                         consumedFrames[fi] = true;
                         break;
                     }
