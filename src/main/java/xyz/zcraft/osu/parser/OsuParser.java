@@ -7,6 +7,7 @@ import desu.life.RosuFFI;
 import xyz.zcraft.osu.model.BeatmapExtended;
 import xyz.zcraft.osu.model.Mod;
 import xyz.zcraft.osu.model.Score;
+import xyz.zcraft.osu.parser.data.DiffSpec;
 
 import java.nio.file.Path;
 import java.util.LinkedList;
@@ -14,14 +15,6 @@ import java.util.LinkedList;
 @SuppressWarnings("unused")
 public class OsuParser {
     private static final Gson GSON = new Gson();
-
-    public static void initialize() {
-        try {
-            new RosuFFI.Beatmap(new byte[0]).close();
-        } catch (RosuFFI.FFIException e) {
-            throw new RuntimeException(e);
-        }
-    }
 
     public static DiffSpec getDiffSpecForMap(BeatmapExtended beatmap, Path beatmapFile, String mod) {
         try (final RosuFFI.Beatmap rosuBeatmap = new RosuFFI.Beatmap(beatmapFile.toAbsolutePath().toString());

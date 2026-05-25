@@ -1,4 +1,4 @@
-package xyz.zcraft.osu.parser;
+package xyz.zcraft.osu.parser.data;
 
 import lombok.Data;
 

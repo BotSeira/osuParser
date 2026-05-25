@@ -1,7 +1,7 @@
 package xyz.zcraft.osu.parser;
 
 import org.apache.commons.compress.compressors.lzma.LZMACompressorInputStream;
-import xyz.zcraft.osu.model.Replay;
+import xyz.zcraft.osu.parser.data.OsuReplay;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
@@ -10,17 +10,17 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.nio.file.Path;
 import java.util.LinkedList;
 import java.util.List;
 
 public class ReplayParser {
-    public static Replay parseReplay(String filePath) throws Exception {
-        byte[] bytes = Files.readAllBytes(Paths.get(filePath));
+    public static OsuReplay parseReplay(Path filePath) throws Exception {
+        byte[] bytes = Files.readAllBytes(filePath);
         return parseReplay(bytes);
     }
 
-    public static Replay parseReplay(byte[] bytes) throws Exception {
+    public static OsuReplay parseReplay(byte[] bytes) throws Exception {
         ByteBuffer buffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
 
         byte gameMode = buffer.get();
@@ -46,9 +46,9 @@ public class ReplayParser {
 
         long timestamp = buffer.getLong();
 
-        final List<Replay.KeyFrame> keyFrames = parseReplayFrames(buffer);
+        final List<OsuReplay.KeyFrame> keyFrames = parseReplayFrames(buffer);
 
-        return new Replay(gameMode, gameVersion, beatmapHash, playerName, replayHash,
+        return new OsuReplay(gameMode, gameVersion, beatmapHash, playerName, replayHash,
                 count300, count100, count50, countGeki, countKatu, countMiss,
                 totalScore, maxCombo, perfectCombo == 1, mods, lifeBarGraph, timestamp, keyFrames);
     }
@@ -64,7 +64,7 @@ public class ReplayParser {
         return new String(stringBytes, StandardCharsets.UTF_8);
     }
 
-    private static List<Replay.KeyFrame> parseReplayFrames(ByteBuffer buffer) throws Exception {
+    private static List<OsuReplay.KeyFrame> parseReplayFrames(ByteBuffer buffer) throws Exception {
         int compressedDataLength = buffer.getInt();
 
         byte[] compressedBytes = new byte[compressedDataLength];
@@ -85,8 +85,8 @@ public class ReplayParser {
         return null;
     }
 
-    private static List<Replay.KeyFrame> analyzeFrames(String replayDataString) {
-        List<Replay.KeyFrame> keyFrames = new LinkedList<>();
+    private static List<OsuReplay.KeyFrame> analyzeFrames(String replayDataString) {
+        List<OsuReplay.KeyFrame> keyFrames = new LinkedList<>();
 
         String[] frames = replayDataString.split(",");
 
@@ -106,7 +106,7 @@ public class ReplayParser {
                 break;
             }
 
-            keyFrames.add(new Replay.KeyFrame(w, x, y, z));
+            keyFrames.add(new OsuReplay.KeyFrame(w, x, y, z));
         }
 
         return keyFrames;
