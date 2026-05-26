@@ -2,10 +2,10 @@ package xyz.zcraft.osu.parser;
 
 import xyz.zcraft.osu.parser.data.HitObject;
 import xyz.zcraft.osu.parser.data.OsuBeatmap;
+import xyz.zcraft.osu.parser.exception.ParseException;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
@@ -13,47 +13,51 @@ import java.security.NoSuchAlgorithmException;
 import java.util.LinkedList;
 
 public class BeatmapParser {
-    public static OsuBeatmap parseBeatmap(Path beatmapPath) throws IOException {
-        OsuBeatmap beatmap = new OsuBeatmap();
-        beatmap.setHitObjects(new LinkedList<>());
-
+    public static OsuBeatmap parseBeatmap(Path beatmapPath) throws ParseException {
         try {
-            MessageDigest md = MessageDigest.getInstance("MD5");
-            final byte[] digest = md.digest(Files.readAllBytes(beatmapPath));
-            StringBuilder hexString = new StringBuilder();
-            for (byte b : digest) {
-                hexString.append(String.format("%02x", b));
-            }
-            beatmap.setHash(hexString.toString());
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException(e);
-        }
+            OsuBeatmap beatmap = new OsuBeatmap();
+            beatmap.setHitObjects(new LinkedList<>());
 
-        String currentSection = "";
-
-        try (BufferedReader reader = new BufferedReader(new FileReader(beatmapPath.toFile()))) {
-            String line;
-
-            while ((line = reader.readLine()) != null) {
-                line = line.trim();
-
-                if (line.isEmpty() || line.startsWith("//")) continue;
-
-                if (line.startsWith("[") && line.endsWith("]")) {
-                    currentSection = line;
-                    continue;
+            try {
+                MessageDigest md = MessageDigest.getInstance("MD5");
+                final byte[] digest = md.digest(Files.readAllBytes(beatmapPath));
+                StringBuilder hexString = new StringBuilder();
+                for (byte b : digest) {
+                    hexString.append(String.format("%02x", b));
                 }
+                beatmap.setHash(hexString.toString());
+            } catch (NoSuchAlgorithmException e) {
+                throw new RuntimeException(e);
+            }
 
-                switch (currentSection) {
-                    case "[General]" -> parseGeneralLine(beatmap, line);
-                    case "[Metadata]" -> parseMetadataLine(beatmap, line);
-                    case "[Difficulty]" -> parseDifficultyLine(beatmap, line);
-                    case "[HitObjects]" -> parseHitObjectLine(beatmap, line);
-                    // Ignore [Editor], [Events], [TimingPoints], [Colours] for now
+            String currentSection = "";
+
+            try (BufferedReader reader = new BufferedReader(new FileReader(beatmapPath.toFile()))) {
+                String line;
+
+                while ((line = reader.readLine()) != null) {
+                    line = line.trim();
+
+                    if (line.isEmpty() || line.startsWith("//")) continue;
+
+                    if (line.startsWith("[") && line.endsWith("]")) {
+                        currentSection = line;
+                        continue;
+                    }
+
+                    switch (currentSection) {
+                        case "[General]" -> parseGeneralLine(beatmap, line);
+                        case "[Metadata]" -> parseMetadataLine(beatmap, line);
+                        case "[Difficulty]" -> parseDifficultyLine(beatmap, line);
+                        case "[HitObjects]" -> parseHitObjectLine(beatmap, line);
+                        // Ignore [Editor], [Events], [TimingPoints], [Colours] for now
+                    }
                 }
             }
+            return beatmap;
+        } catch (Exception e) {
+            throw new ParseException("Cannot parse beatmap", e);
         }
-        return beatmap;
     }
 
     private static void parseDifficultyLine(OsuBeatmap beatmap, String line) {
