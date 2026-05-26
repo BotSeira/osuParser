@@ -156,7 +156,7 @@ public class ReplayAnalyzer {
                             if (objIndex > 0) {
                                 double lastX = hitObjects.get(objIndex - 1).getX();
                                 double lastY = hitObjects.get(objIndex - 1).getY();
-                                angleFromLast = Math.atan2(hitObject.getY() - lastY, hitObject.getX() - lastX);
+                                angleFromLast = Math.atan2(hitObject.getY() - lastY, hitObject.getX() - lastX) + Math.PI;
                             }
 
                             aimBias = new HitEvent.AimBias(theta, distance, angleFromLast);
