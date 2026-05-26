@@ -194,7 +194,7 @@ public class ReplayAnalyzer {
 
         final double ur = calculateUR(events);
 
-        return new ReplayAnalyze(events, ur);
+        return new ReplayAnalyze(beatmap, replay, events, ur);
     }
 
     public static double calculateUR(List<HitEvent> events) {
