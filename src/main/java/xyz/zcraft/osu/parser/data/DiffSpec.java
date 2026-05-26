@@ -28,23 +28,23 @@ public final class DiffSpec implements Serializable {
     private int maxCombo;
     private List<Mod> mods;
 
-    private double getPerfectWindow() {
+    public double getPerfectWindow() {
         return 80 - 6 * od;
     }
 
-    private double getOkWindow() {
+    public double getOkWindow() {
         return 140 - 8 * od;
     }
 
-    private double getMehWindow() {
+    public double getMehWindow() {
         return 200 - 10 * od;
     }
 
-    private double getMissWindow() {
+    public double getMissWindow() {
         return 400;
     }
 
-    private double getCircleRadius() {
+    public double getCircleRadius() {
         return 54.4 - 4.48 * cs;
     }
 }
