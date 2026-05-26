@@ -12,17 +12,28 @@ public record HitEvent(
         float cursorY,
         int keyFlags,
         int frameIndex) {
+    public enum HitResult {
+        PERFECT, OK, MEH, MISS
+    }
+
     public record AimBias(
             double theta,
             double distance,
             double angleFromLast
     ) {
         public AimBias standardize() {
-            return new AimBias(theta - angleFromLast, distance, 0.0);
-        }
-    }
+            double rawTheta = theta - angleFromLast;
 
-    public enum HitResult {
-        PERFECT, OK, MEH, MISS
+            double standardizedTheta = -rawTheta;
+
+            while (standardizedTheta >= 2 * Math.PI) {
+                standardizedTheta -= 2 * Math.PI;
+            }
+            while (standardizedTheta < 0) {
+                standardizedTheta += 2 * Math.PI;
+            }
+
+            return new AimBias(standardizedTheta, distance, 0.0);
+        }
     }
 }
