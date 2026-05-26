@@ -44,6 +44,7 @@ public class ReplayAnalyzer {
 
         final double circleRadius = 54.4 - 4.48 * cs;
 
+        double missWindow = 400; // 0 (MISS)
         double hitWindow = 200 - 10 * od; // 50 (MEH)
         double hitWindowOk = 140 - 8 * od; // 100 (OK)
         double hitWindowPf = 80 - 6 * od; // 300 (PERFECT)
@@ -55,6 +56,7 @@ public class ReplayAnalyzer {
             clockRate = 0.75;
         }
 
+        missWindow /= clockRate;
         hitWindow /= clockRate;
         hitWindowOk /= clockRate;
         hitWindowPf /= clockRate;
@@ -92,7 +94,7 @@ public class ReplayAnalyzer {
             }
 
             long objectStart = hitObject.getTime();
-            double searchFrom = objectStart - hitWindow;
+            double searchFrom = objectStart - missWindow;
             double searchTo = objectStart + hitWindow;
 
             int startIdx = Math.max(0, keyFrameIndex.get());
@@ -178,8 +180,6 @@ public class ReplayAnalyzer {
                     hitResult = HitEvent.HitResult.OK;
                 } else if (Math.abs(offset) <= hitWindow) {
                     hitResult = HitEvent.HitResult.MEH;
-                } else {
-                    throw new IllegalStateException("Hit detected outside of hit windows");
                 }
             } else {
                 keyFrameIndex.set(candidateIdx);
