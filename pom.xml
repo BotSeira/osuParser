@@ -6,7 +6,7 @@
 
     <groupId>xyz.zcraft.osu</groupId>
     <artifactId>osuParser</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>1.0.0</version>
 
     <properties>
         <maven.compiler.source>25</maven.compiler.source>
@@ -81,8 +81,9 @@
         <dependency>
             <groupId>com.github.ZayrexDev</groupId>
             <artifactId>osuModel</artifactId>
-            <version>master-a7b13a170e-1</version>
+            <version>1.0.1</version>
         </dependency>
+
         <!-- Source: https://mvnrepository.com/artifact/org.tukaani/xz -->
         <dependency>
             <groupId>org.tukaani</groupId>
@@ -90,6 +91,7 @@
             <version>1.12</version>
             <scope>compile</scope>
         </dependency>
+
         <!-- Source: https://mvnrepository.com/artifact/org.apache.commons/commons-compress -->
         <dependency>
             <groupId>org.apache.commons</groupId>
@@ -97,6 +99,7 @@
             <version>1.28.0</version>
             <scope>compile</scope>
         </dependency>
+
         <!-- Source: https://mvnrepository.com/artifact/org.projectlombok/lombok -->
         <dependency>
             <groupId>org.projectlombok</groupId>
@@ -104,6 +107,7 @@
             <version>1.18.44</version>
             <scope>compile</scope>
         </dependency>
+
         <dependency>
             <groupId>net.java.dev.jna</groupId>
             <artifactId>jna</artifactId>

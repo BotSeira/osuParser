@@ -133,7 +133,7 @@ public class OsuParser {
         try (final RosuFFI.Beatmap rosuBeatmap = new RosuFFI.Beatmap(beatmapFile.toAbsolutePath().toString());
              final RosuFFI.Performance perf = new RosuFFI.Performance()
         ) {
-            perf.setMods(RosuFFI.Mods.fromAcronyms(score.getMods().stream().reduce("", String::concat), RosuFFI.Mode.Osu));
+            perf.setMods(RosuFFI.Mods.fromAcronyms(score.getMods().stream().map(Mod::getAcronym).reduce("", String::concat), RosuFFI.Mode.Osu));
 
             perf.setAccuracy(score.getAccuracy() * 100);
             perf.setN300(score.getStatistics().get("count_300"));
