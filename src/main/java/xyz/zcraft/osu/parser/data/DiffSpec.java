@@ -1,8 +1,7 @@
 package xyz.zcraft.osu.parser.data;
 
 import lombok.Data;
-
-import xyz.zcraft.osu.model.*;
+import xyz.zcraft.osu.model.Mod;
 
 import java.io.Serializable;
 import java.util.List;
@@ -15,10 +14,20 @@ public final class DiffSpec implements Serializable {
     private double pp95;
     private double aim;
     private double speed;
+
+    @Deprecated
     private double od;
+
+    @Deprecated
     private double cs;
+
+    @Deprecated
     private double ar;
+
+    @Deprecated
     private double hp;
+
+    private DifficultyAttribute difficulty;
     private double star;
     private double bpm;
     private String modStr;
@@ -28,23 +37,28 @@ public final class DiffSpec implements Serializable {
     private int maxCombo;
     private List<Mod> mods;
 
+    @Deprecated
     public double getPerfectWindow() {
-        return 80 - 6 * od;
+        return difficulty.getPerfectWindow();
     }
 
+    @Deprecated
     public double getOkWindow() {
-        return 140 - 8 * od;
+        return difficulty.getOkWindow();
     }
 
+    @Deprecated
     public double getMehWindow() {
-        return 200 - 10 * od;
+        return difficulty.getMehWindow();
     }
 
+    @Deprecated
     public double getMissWindow() {
-        return 400;
+        return difficulty.getMissWindow();
     }
 
+    @Deprecated
     public double getCircleRadius() {
-        return 54.4 - 4.48 * cs;
+        return difficulty.getCircleRadiusInPixel();
     }
 }

@@ -8,6 +8,8 @@ import xyz.zcraft.osu.model.BeatmapExtended;
 import xyz.zcraft.osu.model.Mod;
 import xyz.zcraft.osu.model.Score;
 import xyz.zcraft.osu.parser.data.DiffSpec;
+import xyz.zcraft.osu.parser.data.OsuBeatmap;
+import xyz.zcraft.osu.parser.exception.ParseException;
 
 import java.nio.file.Path;
 import java.util.LinkedList;
@@ -20,6 +22,8 @@ public class OsuParser {
         try (final RosuFFI.Beatmap rosuBeatmap = new RosuFFI.Beatmap(beatmapFile.toAbsolutePath().toString());
              final RosuFFI.Performance perf = new RosuFFI.Performance()
         ) {
+            final OsuBeatmap osuBeatmap = BeatmapParser.parseBeatmap(beatmapFile);
+
             final DiffSpec diffSpec = new DiffSpec();
 
             final RosuFFI.Mods mods = RosuFFI.Mods.fromAcronyms(mod == null ? "" : mod, RosuFFI.Mode.Osu);
@@ -123,8 +127,10 @@ public class OsuParser {
             diffSpec.setMods(modList);
             diffSpec.setMaxCombo(scoreState.max_combo);
 
+            diffSpec.setDifficulty(BeatmapParser.calculateDifficulty(osuBeatmap, mods.getBits()));
+
             return diffSpec;
-        } catch (RosuFFI.FFIException e) {
+        } catch (RosuFFI.FFIException | ParseException e) {
             throw new RuntimeException(e);
         }
     }

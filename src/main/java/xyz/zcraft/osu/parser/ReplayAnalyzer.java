@@ -22,46 +22,12 @@ public class ReplayAnalyzer {
             throw new ParseException("Beatmap hash mismatch");
         }
 
-        boolean hasEZ = (replay.mods() & 2) > 0;
-        boolean hasHR = (replay.mods() & 16) > 0;
-        boolean hasDT = (replay.mods() & 64) > 0;
-        boolean hasHT = (replay.mods() & 256) > 0;
-        boolean hasNC = (replay.mods() & 512) > 0;
+        final DifficultyAttribute diff = BeatmapParser.calculateDifficulty(beatmap, replay.mods());
 
-        double cs = beatmap.getCs();
-        double od = beatmap.getOd();
-        double ar = beatmap.getAr();
+        final double circleRadius = diff.getCircleRadiusInPixel();
 
-        if (hasHR) {
-            cs = Math.min(10.0, cs * 1.3);
-            od = Math.min(10.0, od * 1.4);
-            ar = Math.min(10.0, ar * 1.4);
-        } else if (hasEZ) {
-            cs = cs * 0.5;
-            od = od * 0.5;
-            ar = ar * 0.5;
-        }
-
-        final double circleRadius = 54.4 - 4.48 * cs;
-
-        double missWindow = 400; // 0 (MISS)
-        double hitWindow = 200 - 10 * od; // 50 (MEH)
-        double hitWindowOk = 140 - 8 * od; // 100 (OK)
-        double hitWindowPf = 80 - 6 * od; // 300 (PERFECT)
-
-        double clockRate = 1.0;
-        if (hasDT || hasNC) {
-            clockRate = 1.5;
-        } else if (hasHT) {
-            clockRate = 0.75;
-        }
-
-        missWindow /= clockRate;
-        hitWindow /= clockRate;
-        hitWindowOk /= clockRate;
-        hitWindowPf /= clockRate;
-
-        applyStackLeniency(beatmap.getHitObjects(), cs, ar, beatmap.getStackLeniency());
+        // Not sure if this is needed
+//        applyStackLeniency(beatmap.getHitObjects(), diff.cs(), diff.ar(), beatmap.getStackLeniency());
 
         final int n = keyFrames.size();
         long[] cumulative = new long[n];
@@ -94,8 +60,8 @@ public class ReplayAnalyzer {
             }
 
             long objectStart = hitObject.getTime();
-            double searchFrom = objectStart - missWindow;
-            double searchTo = objectStart + hitWindow;
+            double searchFrom = objectStart - diff.getMissWindow();
+            double searchTo = objectStart + diff.getMehWindow();
 
             int startIdx = Math.max(0, keyFrameIndex.get());
             int candidateIdx;
@@ -174,11 +140,11 @@ public class ReplayAnalyzer {
             if (wasHit) {
                 keyFrameIndex.set(foundFrameIndex);
 
-                if (Math.abs(offset) <= hitWindowPf) {
+                if (Math.abs(offset) <= diff.getPerfectWindow()) {
                     hitResult = HitEvent.HitResult.PERFECT;
-                } else if (Math.abs(offset) <= hitWindowOk) {
+                } else if (Math.abs(offset) <= diff.getOkWindow()) {
                     hitResult = HitEvent.HitResult.OK;
-                } else if (Math.abs(offset) <= hitWindow) {
+                } else if (Math.abs(offset) <= diff.getMehWindow()) {
                     hitResult = HitEvent.HitResult.MEH;
                 }
             } else {
@@ -194,7 +160,7 @@ public class ReplayAnalyzer {
 
         final double ur = calculateUR(events);
 
-        return new ReplayAnalyze(beatmap, replay, events, ur);
+        return new ReplayAnalyze(beatmap, diff, replay, events, ur);
     }
 
     public static double calculateUR(List<HitEvent> events) {

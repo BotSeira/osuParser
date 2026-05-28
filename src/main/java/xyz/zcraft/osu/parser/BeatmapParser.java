@@ -1,5 +1,6 @@
 package xyz.zcraft.osu.parser;
 
+import xyz.zcraft.osu.parser.data.DifficultyAttribute;
 import xyz.zcraft.osu.parser.data.HitObject;
 import xyz.zcraft.osu.parser.data.OsuBeatmap;
 import xyz.zcraft.osu.parser.exception.ParseException;
@@ -175,5 +176,42 @@ public class BeatmapParser {
         } catch (NumberFormatException e) {
             return 0;
         }
+    }
+
+    public static DifficultyAttribute calculateDifficulty(OsuBeatmap beatmap, long mods) {
+        boolean hasEZ = (mods & 2) > 0;
+        boolean hasHR = (mods & 16) > 0;
+        boolean hasDT = (mods & 64) > 0;
+        boolean hasHT = (mods & 256) > 0;
+        boolean hasNC = (mods & 512) > 0;
+
+        double cs = beatmap.getCs();
+        double od = beatmap.getOd();
+        double ar = beatmap.getAr();
+        double hp = beatmap.getHp();
+
+        if (hasHR) {
+            cs = Math.min(10.0, cs * 1.3);
+            od = Math.min(10.0, od * 1.4);
+            ar = Math.min(10.0, ar * 1.4);
+            hp = Math.min(10.0, hp * 1.4);
+        } else if (hasEZ) {
+            cs = cs * 0.5;
+            od = od * 0.5;
+            ar = ar * 0.5;
+            hp = hp * 0.5;
+        }
+
+        double clockRate = 1.0;
+        if (hasDT || hasNC) {
+            clockRate = 1.5;
+        } else if (hasHT) {
+            clockRate = 0.75;
+        }
+
+        double window = (80.0 - (6.0 * od)) / clockRate;
+        od = (80.0 - window) / 6;
+
+        return new DifficultyAttribute(cs, od, ar, hp);
     }
 }
