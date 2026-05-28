@@ -212,6 +212,6 @@ public class BeatmapParser {
         double window = (80.0 - (6.0 * od)) / clockRate;
         od = (80.0 - window) / 6;
 
-        return new DifficultyAttribute(cs, od, ar, hp);
+        return new DifficultyAttribute(cs, od, ar, hp, beatmap.getOd(), clockRate);
     }
 }
