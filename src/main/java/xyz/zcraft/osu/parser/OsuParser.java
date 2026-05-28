@@ -136,10 +136,10 @@ public class OsuParser {
             perf.setMods(RosuFFI.Mods.fromAcronyms(score.getMods().stream().map(Mod::getAcronym).reduce("", String::concat), RosuFFI.Mode.Osu));
 
             perf.setAccuracy(score.getAccuracy() * 100);
-            perf.setN300(score.getStatistics().get("count_300"));
-            perf.setN100(score.getStatistics().get("count_100"));
-            perf.setN50(score.getStatistics().get("count_50"));
-            perf.setMisses(score.getStatistics().get("count_miss"));
+            perf.setN300(score.getStatistics().getOrDefault("great", 0L));
+            perf.setN100(score.getStatistics().getOrDefault("ok", 0L));
+            perf.setN50(score.getStatistics().getOrDefault("meh", 0L));
+            perf.setMisses(score.getStatistics().getOrDefault("miss", 0L));
 
             var calc = perf.calculate(rosuBeatmap);
 
