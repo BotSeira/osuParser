@@ -11,7 +11,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class ReplayAnalyzer {
     public static ReplayAnalyze analyze(OsuBeatmap beatmap, OsuReplay replay) throws ParseException {
-        final List<OsuReplay.KeyFrame> keyFrames = replay.keyFrames();
+        final List<OsuReplay.TimedKeyFrame> keyFrames = replay.timedKeyFrames();
         List<HitEvent> events = new ArrayList<>();
 
         if (keyFrames == null || keyFrames.isEmpty() || beatmap == null || beatmap.getHitObjects() == null) {
@@ -29,17 +29,10 @@ public class ReplayAnalyzer {
         // Not sure if this is needed
 //        applyStackLeniency(beatmap.getHitObjects(), diff.cs(), diff.ar(), beatmap.getStackLeniency());
 
-        final int n = keyFrames.size();
-        long[] cumulative = new long[n];
-        long t = 0L;
-        for (int i = 0; i < n; i++) {
-            final long offset = keyFrames.get(i).offset();
-            t += offset;
-            cumulative[i] = t;
-        }
-
         AtomicInteger keyFrameIndex = new AtomicInteger(0);
         List<HitObject> hitObjects = beatmap.getHitObjects();
+
+        final int n = keyFrames.size();
 
         boolean[] consumedFrames = new boolean[n];
 
@@ -66,7 +59,7 @@ public class ReplayAnalyzer {
             int startIdx = Math.max(0, keyFrameIndex.get());
             int candidateIdx;
 
-            while (startIdx < n && cumulative[startIdx] < searchFrom) {
+            while (startIdx < n && keyFrames.get(startIdx).time() < searchFrom) {
                 startIdx++;
             }
             candidateIdx = (startIdx >= n) ? n - 1 : startIdx;
@@ -77,13 +70,13 @@ public class ReplayAnalyzer {
             HitEvent.AimBias aimBias = null;
 
             for (int fi = candidateIdx; fi < n; fi++) {
-                long frameTime = cumulative[fi];
+                long frameTime = keyFrames.get(fi).time();
                 if (frameTime < searchFrom) continue;
                 if (frameTime > searchTo) break;
 
                 if (consumedFrames[fi]) continue;
 
-                OsuReplay.KeyFrame frame = keyFrames.get(fi);
+                OsuReplay.TimedKeyFrame frame = keyFrames.get(fi);
                 int currentFlags = frame.key();
 
                 int previousFlags = fi > 0 ? keyFrames.get(fi - 1).key() : 0;
@@ -132,7 +125,7 @@ public class ReplayAnalyzer {
             }
 
             boolean wasHit = foundFrameIndex != -1;
-            long frameTime = wasHit ? cumulative[foundFrameIndex] : -1L;
+            long frameTime = wasHit ? keyFrames.get(foundFrameIndex).time() : -1L;
             long offset = wasHit ? (frameTime - objectStart) : Long.MIN_VALUE;
             float cursorX = wasHit ? keyFrames.get(foundFrameIndex).cursorX() : Float.NaN;
             float cursorY = wasHit ? keyFrames.get(foundFrameIndex).cursorY() : Float.NaN;

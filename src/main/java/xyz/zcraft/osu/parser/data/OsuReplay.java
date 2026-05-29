@@ -20,7 +20,9 @@ public record OsuReplay(
         int mods,
         String lifeBarGraph,
         long timestamp,
-        List<KeyFrame> keyFrames
+        @Deprecated
+        List<KeyFrame> keyFrames,
+        List<TimedKeyFrame> timedKeyFrames
 ) {
     public record KeyFrame(
             long offset,
@@ -29,4 +31,12 @@ public record OsuReplay(
             int key
     ) {
     }
+
+    public record TimedKeyFrame(
+            long time,
+            long offset,
+            float cursorX,
+            float cursorY,
+            int key
+    ){}
 }

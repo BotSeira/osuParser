@@ -2,6 +2,7 @@ package xyz.zcraft.osu.parser;
 
 import org.apache.commons.compress.compressors.lzma.LZMACompressorInputStream;
 import xyz.zcraft.osu.parser.data.OsuReplay;
+import xyz.zcraft.osu.parser.exception.ParseException;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
@@ -11,6 +12,7 @@ import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -48,9 +50,15 @@ public class ReplayParser {
 
         final List<OsuReplay.KeyFrame> keyFrames = parseReplayFrames(buffer);
 
+        if (keyFrames == null) {
+            throw new ParseException("Failed to parse replay frames");
+        }
+
+        final List<OsuReplay.TimedKeyFrame> timedKeyFrames = timeKeyFrame(keyFrames);
+
         return new OsuReplay(gameMode, gameVersion, beatmapHash, playerName, replayHash,
                 count300, count100, count50, countGeki, countKatu, countMiss,
-                totalScore, maxCombo, perfectCombo == 1, mods, lifeBarGraph, timestamp, keyFrames);
+                totalScore, maxCombo, perfectCombo == 1, mods, lifeBarGraph, timestamp, keyFrames, timedKeyFrames);
     }
 
     private static String readOsuString(ByteBuffer buffer) {
@@ -83,6 +91,18 @@ public class ReplayParser {
         }
 
         return null;
+    }
+
+    private static List<OsuReplay.TimedKeyFrame> timeKeyFrame(List<OsuReplay.KeyFrame> keyFrames) {
+        ArrayList<OsuReplay.TimedKeyFrame> timedKeyFrames = new ArrayList<>(keyFrames.size());
+
+        long t = 0L;
+        for (final OsuReplay.KeyFrame cur : keyFrames) {
+            t += cur.offset();
+            timedKeyFrames.add(new OsuReplay.TimedKeyFrame(t, cur.offset(), cur.cursorX(), cur.cursorY(), cur.key()));
+        }
+
+        return timedKeyFrames;
     }
 
     private static List<OsuReplay.KeyFrame> analyzeFrames(String replayDataString) {
