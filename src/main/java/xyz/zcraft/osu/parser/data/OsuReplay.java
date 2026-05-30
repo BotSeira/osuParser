@@ -20,8 +20,6 @@ public record OsuReplay(
         int mods,
         String lifeBarGraph,
         long timestamp,
-        @Deprecated
-        List<KeyFrame> keyFrames,
         List<TimedKeyFrame> timedKeyFrames
 ) {
     public record KeyFrame(

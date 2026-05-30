@@ -190,15 +190,15 @@ public class BeatmapParser {
         double ar = beatmap.getAr();
         double hp = beatmap.getHp();
 
+        double approachTime = ar >= 5 ? (1200 - 150 * (ar - 5)) : (1800 - 120 * ar);
+
         if (hasHR) {
             cs = Math.min(10.0, cs * 1.3);
             od = Math.min(10.0, od * 1.4);
-            ar = Math.min(10.0, ar * 1.4);
             hp = Math.min(10.0, hp * 1.4);
         } else if (hasEZ) {
             cs = cs * 0.5;
             od = od * 0.5;
-            ar = ar * 0.5;
             hp = hp * 0.5;
         }
 
@@ -207,6 +207,14 @@ public class BeatmapParser {
             clockRate = 1.5;
         } else if (hasHT) {
             clockRate = 0.75;
+        }
+
+        approachTime = approachTime / clockRate;
+
+        if (approachTime > 1200) {
+            ar = (1800 - approachTime) / 120;
+        } else {
+            ar = 5 + (1200 - approachTime) / 150;
         }
 
         double window = (80.0 - (6.0 * od)) / clockRate;

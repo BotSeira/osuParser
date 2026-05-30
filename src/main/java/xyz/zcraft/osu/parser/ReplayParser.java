@@ -58,7 +58,7 @@ public class ReplayParser {
 
         return new OsuReplay(gameMode, gameVersion, beatmapHash, playerName, replayHash,
                 count300, count100, count50, countGeki, countKatu, countMiss,
-                totalScore, maxCombo, perfectCombo == 1, mods, lifeBarGraph, timestamp, keyFrames, timedKeyFrames);
+                totalScore, maxCombo, perfectCombo == 1, mods, lifeBarGraph, timestamp, timedKeyFrames);
     }
 
     private static String readOsuString(ByteBuffer buffer) {
