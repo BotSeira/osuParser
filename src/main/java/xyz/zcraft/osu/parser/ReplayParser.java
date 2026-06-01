@@ -1,7 +1,7 @@
 package xyz.zcraft.osu.parser;
 
 import org.apache.commons.compress.compressors.lzma.LZMACompressorInputStream;
-import xyz.zcraft.osu.parser.data.OsuReplay;
+import xyz.zcraft.osu.parser.data.replay.OsuReplay;
 import xyz.zcraft.osu.parser.exception.ParseException;
 
 import java.io.BufferedReader;

@@ -1,8 +1,7 @@
-package xyz.zcraft.osu.parser.data;
+package xyz.zcraft.osu.parser.data.replay;
 
 import java.util.List;
 
-@Deprecated
 public record OsuReplay(
         byte gameMode,
         int gameVersion,

@@ -1,6 +1,5 @@
-package xyz.zcraft.osu.parser.data;
+package xyz.zcraft.osu.parser.data.beatmap;
 
-@Deprecated
 public record DifficultyAttribute(
         double cs,
         double od,

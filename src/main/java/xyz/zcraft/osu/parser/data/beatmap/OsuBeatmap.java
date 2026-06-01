@@ -1,12 +1,11 @@
-package xyz.zcraft.osu.parser.data;
+package xyz.zcraft.osu.parser.data.beatmap;
 
 import lombok.Data;
 
 import java.awt.*;
-import java.util.*;
+import java.util.LinkedList;
 import java.util.List;
 
-@Deprecated
 @Data
 public class OsuBeatmap {
     private String hash;

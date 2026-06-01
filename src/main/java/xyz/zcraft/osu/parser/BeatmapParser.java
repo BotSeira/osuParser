@@ -1,8 +1,8 @@
 package xyz.zcraft.osu.parser;
 
-import xyz.zcraft.osu.parser.data.DifficultyAttribute;
-import xyz.zcraft.osu.parser.data.HitObject;
-import xyz.zcraft.osu.parser.data.OsuBeatmap;
+import xyz.zcraft.osu.parser.data.beatmap.DifficultyAttribute;
+import xyz.zcraft.osu.parser.data.beatmap.HitObject;
+import xyz.zcraft.osu.parser.data.beatmap.OsuBeatmap;
 import xyz.zcraft.osu.parser.exception.ParseException;
 
 import java.awt.*;

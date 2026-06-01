@@ -1,11 +1,10 @@
-package xyz.zcraft.osu.parser.data;
+package xyz.zcraft.osu.parser.data.beatmap;
 
 import lombok.Data;
 
 import java.util.ArrayList;
 import java.util.List;
 
-@Deprecated
 @Data
 public class HitObject {
     private int x, y, typeFlag, hitSoundFlag;

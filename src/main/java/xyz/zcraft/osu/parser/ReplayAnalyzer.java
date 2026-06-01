@@ -1,6 +1,7 @@
 package xyz.zcraft.osu.parser;
 
-import xyz.zcraft.osu.parser.data.*;
+import xyz.zcraft.osu.parser.data.replay.*;
+import xyz.zcraft.osu.parser.data.beatmap.*;
 import xyz.zcraft.osu.parser.exception.ParseException;
 
 import java.util.ArrayList;

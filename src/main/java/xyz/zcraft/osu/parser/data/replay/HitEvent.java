@@ -1,6 +1,7 @@
-package xyz.zcraft.osu.parser.data;
+package xyz.zcraft.osu.parser.data.replay;
 
-@Deprecated
+import xyz.zcraft.osu.parser.data.beatmap.HitObject;
+
 public record HitEvent(
         int objectIndex,
         HitObject hitObject,

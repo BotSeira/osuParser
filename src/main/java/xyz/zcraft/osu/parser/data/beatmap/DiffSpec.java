@@ -1,4 +1,4 @@
-package xyz.zcraft.osu.parser.data;
+package xyz.zcraft.osu.parser.data.beatmap;
 
 import lombok.Data;
 import xyz.zcraft.osu.model.Mod;
@@ -7,7 +7,6 @@ import java.io.Serializable;
 import java.util.List;
 
 @SuppressWarnings("unused")
-@Deprecated
 @Data
 public final class DiffSpec implements Serializable {
     private double ppSS;
@@ -15,18 +14,6 @@ public final class DiffSpec implements Serializable {
     private double pp95;
     private double aim;
     private double speed;
-
-    @Deprecated
-    private double od;
-
-    @Deprecated
-    private double cs;
-
-    @Deprecated
-    private double ar;
-
-    @Deprecated
-    private double hp;
 
     private DifficultyAttribute difficulty;
     private double star;

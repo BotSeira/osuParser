@@ -7,8 +7,8 @@ import desu.life.RosuFFI;
 import xyz.zcraft.osu.model.BeatmapExtended;
 import xyz.zcraft.osu.model.Mod;
 import xyz.zcraft.osu.model.Score;
-import xyz.zcraft.osu.parser.data.DiffSpec;
-import xyz.zcraft.osu.parser.data.OsuBeatmap;
+import xyz.zcraft.osu.parser.data.beatmap.DiffSpec;
+import xyz.zcraft.osu.parser.data.beatmap.OsuBeatmap;
 import xyz.zcraft.osu.parser.exception.ParseException;
 
 import java.nio.file.Path;
@@ -44,7 +44,6 @@ public class OsuParser {
             calc = perf.calculate(rosuBeatmap);
             diffSpec.setPp95(calc.osu.t.pp);
 
-
             perf.setAccuracy(100.0);
             perf.setMisses(0);
 
@@ -67,19 +66,6 @@ public class OsuParser {
                 diffSpec.setModded(true);
             }
 
-            diffSpec.setAr(calc.osu.t.difficulty.ar);
-            diffSpec.setHp(calc.osu.t.difficulty.hp);
-            diffSpec.setCs(beatmap.cs);
-            diffSpec.setOd(beatmap.accuracy);
-
-            // Calculate BPM CS Length
-
-            if (mods.contains("HR")) {
-                diffSpec.setCs(Math.min(diffSpec.getCs() * 1.3, 10));
-            } else if (mods.contains("EZ")) {
-                diffSpec.setCs(Math.min(diffSpec.getCs() * 0.5, 10));
-            }
-
             if (mods.contains("DT") || mods.contains("NC")) {
                 diffSpec.setBpm(diffSpec.getBpm() * 1.5);
                 diffSpec.setLength(diffSpec.getLength() / 1.5);
@@ -88,34 +74,6 @@ public class OsuParser {
                 diffSpec.setBpm(diffSpec.getBpm() * 0.75);
                 diffSpec.setLength(diffSpec.getLength() / 0.75);
                 diffSpec.setTotalLength(diffSpec.getTotalLength() / 0.75);
-            }
-
-            // Calculate OD
-
-            boolean changingOd = false;
-            double od = beatmap.getAccuracy();
-            if (mods.contains("HR")) {
-                changingOd = true;
-                od = Math.min(od * 1.4, 10);
-            } else if (mods.contains("EZ")) {
-                changingOd = true;
-                od = od * 0.5;
-            }
-
-            double window = 80.0 - (6.0 * od);
-
-            if (mods.contains("DT") || mods.contains("NC")) {
-                changingOd = true;
-                window = window / 1.5;
-            } else if (mods.contains("HT") || mods.contains("DC")) {
-                changingOd = true;
-                window = window / 0.75;
-            }
-
-            od = (80.0 - window) / 6;
-
-            if (changingOd) {
-                diffSpec.setOd(od);
             }
 
             final LinkedList<Mod> modList = new LinkedList<>();
