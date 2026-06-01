@@ -232,4 +232,32 @@ public class ReplayAnalyzer {
             }
         }
     }
+
+    public static double calculateWindowAccuracy(ReplayAnalyze replayAnalyze, long startTime, long endTime) {
+        int totalHits = 0;
+        double score = 0;
+
+        final List<HitEvent> events = replayAnalyze.events();
+        for (HitEvent event : events) {
+            final long time = event.hitObject().getTime();
+            if (time >= startTime && time <= endTime) {
+                totalHits++;
+
+                HitEvent.HitResult hitValue = event.hitResult();
+                if (hitValue == HitEvent.HitResult.PERFECT) {
+                    score += 300;
+                } else if (hitValue == HitEvent.HitResult.OK) {
+                    score += 100;
+                } else if (hitValue == HitEvent.HitResult.MEH) {
+                    score += 50;
+                }
+            }
+
+            if (time > endTime) break;
+        }
+
+        if (totalHits == 0) return 0.0;
+
+        return score / (totalHits * 300.0);
+    }
 }

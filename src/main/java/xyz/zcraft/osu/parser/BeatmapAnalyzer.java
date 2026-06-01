@@ -1,28 +1,33 @@
 package xyz.zcraft.osu.parser;
 
-import org.jetbrains.annotations.Nullable;
-import xyz.zcraft.osu.parser.data.TimeRange;
+import desu.life.RosuFFI;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
+import xyz.zcraft.osu.parser.data.beatmap.WindowDifficulty;
 import xyz.zcraft.osu.parser.data.beatmap.HitObject;
 import xyz.zcraft.osu.parser.data.beatmap.OsuBeatmap;
+import xyz.zcraft.osu.parser.exception.AnalyzeException;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 public class BeatmapAnalyzer {
-    @Nullable
-    public static TimeRange calculateDifficultyPeak(OsuBeatmap osuBeatmap) {
-        List<Long> timestamps = extractTimestamps(osuBeatmap);
-        if (timestamps.isEmpty()) return null;
+    public static WindowDifficulty getDifficultyPeak(OsuBeatmap osuBeatmap) {
+        final var difficulty = getWindowDifficulties(osuBeatmap);
 
-        final double bufferedStart = getBufferedStart(osuBeatmap, timestamps);
-        double finalEnd = bufferedStart + 11.5;
-
-        return new TimeRange(bufferedStart, finalEnd);
+        return difficulty.stream().sorted(Comparator.comparing(WindowDifficulty::starRating)).toList().reversed().getFirst();
     }
 
-    private static double getBufferedStart(OsuBeatmap osuBeatmap, List<Long> timestamps) {
+    public static List<WindowDifficulty> getWindowDifficulties(OsuBeatmap osuBeatmap) {
+        List<Long> timestamps = extractTimestamps(osuBeatmap);
+        if (timestamps.isEmpty()) {
+            throw new AnalyzeException("No hit objects found in the beatmap.");
+        }
+
         double maxStarRating = 0;
-        int bestStartIndex = 0;
-        long windowDurationMs = 10000;
+        long windowDurationMs = 20 * 1000L;
+        List<WindowDifficulty> difficulties = new ArrayList<>((int) (timestamps.getLast() / windowDurationMs + 1));
 
         for (int i = 0; i < timestamps.size(); i++) {
             long windowStartTime = timestamps.get(i);
@@ -33,29 +38,32 @@ public class BeatmapAnalyzer {
             }
 
             try {
-                double windowSR = calculateWindowDifficulty(osuBeatmap, windowStartTime, windowEndTime);
+                var windowSR = calculateWindowDifficulty(osuBeatmap, windowStartTime, windowEndTime);
 
-                if (windowSR > maxStarRating) {
-                    maxStarRating = windowSR;
-                    bestStartIndex = i;
+                if (windowSR.getKey() > maxStarRating) {
+                    maxStarRating = windowSR.getKey();
                 }
+
+                difficulties.add(new WindowDifficulty(windowStartTime, windowEndTime, windowSR.getKey(), windowSR.getValue()));
             } catch (Exception e) {
-                System.err.println("Failed to calculate window SR at " + windowStartTime + "ms: " + e.getMessage());
+                throw new AnalyzeException("Failed to calculate window difficulty around " + windowStartTime, e);
             }
         }
 
-        double highlightStart = timestamps.get(bestStartIndex) / 1000.0;
-        return Math.max(0, highlightStart - 1.5);
+        return difficulties;
     }
 
-    public static double calculateWindowDifficulty(OsuBeatmap osuBeatmap, long startTimeMs, long endTimeMs) {
+    public static Pair<Double, Double> calculateWindowDifficulty(OsuBeatmap osuBeatmap, long startTimeMs, long endTimeMs) {
         String slicedOsuString = osuBeatmap.toWindowedBeatmapString(startTimeMs, endTimeMs);
 
         try (
                 desu.life.RosuFFI.Beatmap beatmap = new desu.life.RosuFFI.Beatmap(slicedOsuString.getBytes());
-                desu.life.RosuFFI.Difficulty diff = new desu.life.RosuFFI.Difficulty()
+                desu.life.RosuFFI.Difficulty diff = new desu.life.RosuFFI.Difficulty();
+                desu.life.RosuFFI.Performance performance = new RosuFFI.Performance()
         ) {
-            return diff.calculate(beatmap).osu.t.stars;
+            final double stars = diff.calculate(beatmap).osu.t.stars;
+            final double pp = performance.calculate(beatmap).osu.t.pp;
+            return new ImmutablePair<>(stars, pp);
         } catch (Exception e) {
             throw new RuntimeException("Failed to calculate window difficulty", e);
         }

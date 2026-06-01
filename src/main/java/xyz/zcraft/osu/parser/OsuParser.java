@@ -9,9 +9,13 @@ import xyz.zcraft.osu.model.Mod;
 import xyz.zcraft.osu.model.Score;
 import xyz.zcraft.osu.parser.data.beatmap.DiffSpec;
 import xyz.zcraft.osu.parser.data.beatmap.OsuBeatmap;
+import xyz.zcraft.osu.parser.data.beatmap.WindowDifficulty;
+import xyz.zcraft.osu.parser.data.replay.ReplayAnalyze;
+import xyz.zcraft.osu.parser.data.replay.WdPerform;
 import xyz.zcraft.osu.parser.exception.ParseException;
 
 import java.nio.file.Path;
+import java.util.Comparator;
 import java.util.LinkedList;
 
 @SuppressWarnings("unused")
@@ -111,5 +115,18 @@ public class OsuParser {
         } catch (RosuFFI.FFIException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public static WdPerform getHighlight(ReplayAnalyze ra) {
+        return BeatmapAnalyzer.getWindowDifficulties(ra.beatmap())
+                .stream().map(wd -> calculatePerform(ra, wd))
+                .sorted(Comparator.comparing(WdPerform::wdScore))
+                .toList()
+                .getLast();
+    }
+
+    private static WdPerform calculatePerform(ReplayAnalyze ra, WindowDifficulty wd) {
+        final double acc = ReplayAnalyzer.calculateWindowAccuracy(ra, wd.start(), wd.end());
+        return new WdPerform(wd.start(), wd.end(), wd.pp(), acc, wd.pp() * Math.pow(acc, 3));
     }
 }
