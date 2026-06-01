@@ -5,19 +5,20 @@ import xyz.zcraft.osu.parser.data.HitObject;
 import xyz.zcraft.osu.parser.data.OsuBeatmap;
 import xyz.zcraft.osu.parser.exception.ParseException;
 
+import java.awt.*;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.LinkedList;
+import java.util.ArrayList;
+import java.util.List;
 
 public class BeatmapParser {
     public static OsuBeatmap parseBeatmap(Path beatmapPath) throws ParseException {
         try {
             OsuBeatmap beatmap = new OsuBeatmap();
-            beatmap.setHitObjects(new LinkedList<>());
 
             try {
                 MessageDigest md = MessageDigest.getInstance("MD5");
@@ -48,10 +49,13 @@ public class BeatmapParser {
 
                     switch (currentSection) {
                         case "[General]" -> parseGeneralLine(beatmap, line);
+                        case "[Editor]" -> parseEditorLine(beatmap, line);
                         case "[Metadata]" -> parseMetadataLine(beatmap, line);
                         case "[Difficulty]" -> parseDifficultyLine(beatmap, line);
+                        case "[Events]" -> {} // Ignored for now
+                        case "[TimingPoints]" -> parseTimingPointsLine(beatmap, line);
+                        case "[Colours]" -> parseColoursLine(beatmap, line);
                         case "[HitObjects]" -> parseHitObjectLine(beatmap, line);
-                        // Ignore [Editor], [Events], [TimingPoints], [Colours] for now
                     }
                 }
             }
@@ -98,12 +102,27 @@ public class BeatmapParser {
         }
     }
 
-    private static void parseMetadataLine(OsuBeatmap beatmap, String line) {
+    private static void parseEditorLine(OsuBeatmap beatmap, String line) {
         String[] kv = line.split(":", 2);
         if (kv.length < 2) return;
 
         String key = kv[0].trim();
         String value = kv[1].trim();
+
+        switch (key) {
+            case "Bookmark" -> beatmap.setBookmarks(parseLongListSafe(value));
+            case "DistanceSpacing" -> beatmap.setDistanceSpacing(parseDoubleSafe(value));
+            case "BeatDivisor" -> beatmap.setBeatDivisor(parseIntSafe(value));
+            case "GridSize" -> beatmap.setGridSize(parseIntSafe(value));
+            case "TimelineZoom" -> beatmap.setTimelineZoom(parseDoubleSafe(value));
+        }
+    }
+
+    private static void parseMetadataLine(OsuBeatmap beatmap, String line) {
+        String[] kv = line.split(":", 2);
+
+        String key = kv[0].trim();
+        String value = kv.length < 2 ? "" : kv[1].trim();
 
         switch (key) {
             case "Title" -> beatmap.setTitle(value);
@@ -154,6 +173,29 @@ public class BeatmapParser {
         beatmap.getHitObjects().add(obj);
     }
 
+    private static void parseTimingPointsLine(OsuBeatmap beatmap, String line) {
+        final String[] split = line.split(",");
+        beatmap.getTimingPoints().add(
+                new OsuBeatmap.TimingPoint(
+                        parseLongSafe(split[0]),
+                        parseDoubleSafe(split[1]),
+                        parseIntSafe(split[2]),
+                        parseIntSafe(split[3]),
+                        parseIntSafe(split[4]),
+                        parseIntSafe(split[5]),
+                        parseIntSafe(split[6]),
+                        parseIntSafe(split[7])
+                ));
+    }
+
+    private static void parseColoursLine(OsuBeatmap beatmap, String line) {
+        final String[] kv = line.split(":");
+        final String[] rgb = kv[1].split(",");
+
+        Color c = new Color(parseIntSafe(rgb[0]), parseIntSafe(rgb[1]), parseIntSafe(rgb[2]));
+        beatmap.getColours().add(c);
+    }
+
     private static long parseLongSafe(String value) {
         try {
             return Long.parseLong(value);
@@ -175,6 +217,19 @@ public class BeatmapParser {
             return Double.parseDouble(value);
         } catch (NumberFormatException e) {
             return 0;
+        }
+    }
+
+    private static List<Long> parseLongListSafe(String value) {
+        try {
+            final String[] split = value.split(",");
+            final ArrayList<Long> values = new ArrayList<>();
+            for (String s : split) {
+                values.add(Long.parseLong(s));
+            }
+            return values;
+        } catch (Exception e) {
+            return List.of();
         }
     }
 
