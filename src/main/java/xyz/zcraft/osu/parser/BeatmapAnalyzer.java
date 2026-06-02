@@ -9,6 +9,7 @@ import xyz.zcraft.osu.parser.data.beatmap.OsuBeatmap;
 import xyz.zcraft.osu.parser.exception.AnalyzeException;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -58,12 +59,14 @@ public class BeatmapAnalyzer {
 
     public static Pair<Double, Double> calculateWindowDifficulty(OsuBeatmap osuBeatmap, long startTimeMs, long endTimeMs) {
         String slicedOsuString = osuBeatmap.toWindowedBeatmapString(startTimeMs, endTimeMs);
+
+        byte[] pinnedBytes = slicedOsuString.getBytes(StandardCharsets.UTF_8);
         try {
             final Path tempFile = Files.createTempFile("osu-parser-beatmap-temp", ".osu");
             tempFile.toFile().deleteOnExit();
             Files.writeString(tempFile, slicedOsuString);
             try (
-                    desu.life.RosuFFI.Beatmap beatmap = new desu.life.RosuFFI.Beatmap(slicedOsuString.getBytes());
+                    desu.life.RosuFFI.Beatmap beatmap = new desu.life.RosuFFI.Beatmap(pinnedBytes);
                     desu.life.RosuFFI.Difficulty diff = new desu.life.RosuFFI.Difficulty();
                     desu.life.RosuFFI.Performance performance = new RosuFFI.Performance()
             ) {

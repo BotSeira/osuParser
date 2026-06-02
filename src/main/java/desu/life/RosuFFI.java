@@ -1,11 +1,5 @@
 package desu.life;
 
-import com.sun.jna.Memory;
-import com.sun.jna.Native;
-import com.sun.jna.Pointer;
-import com.sun.jna.Structure;
-import com.sun.jna.ptr.PointerByReference;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -14,7 +8,13 @@ import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.util.Optional;
 
-@SuppressWarnings("ALL")
+import com.sun.jna.Memory;
+import com.sun.jna.Native;
+import com.sun.jna.Pointer;
+import com.sun.jna.Structure;
+import com.sun.jna.ptr.PointerByReference;
+
+@SuppressWarnings("all")
 public class RosuFFI {
     private static final Cleaner cleaner = Cleaner.create();
 
@@ -100,6 +100,40 @@ public class RosuFFI {
         }
     }
 
+    public enum TooSuspicious {
+        /// Notes are too dense time-wise.
+        Density(0),
+        /// The map seems too long.
+        Length(1),
+        /// Too many objects.
+        ObjectCount(2),
+        /// General red flag.
+        RedFlag(3),
+        /// Too many sliders' positions were suspicious.
+        SliderPositions(4),
+        /// Too many sliders had a very high amount of repeats.
+        SliderRepeats(5);
+
+        private final int value;
+
+        TooSuspicious(int value) {
+            this.value = value;
+        }
+
+        public int getValue() {
+            return value;
+        }
+
+        public static TooSuspicious fromValue(int value) {
+            for (TooSuspicious v : values()) {
+                if (v.value == value) {
+                    return v;
+                }
+            }
+            throw new IllegalArgumentException("Unknown TooSuspicious value: " + value);
+        }
+    }
+
     public interface FFIError {
         int Ok = 0;
         int Null = 100;
@@ -127,6 +161,7 @@ public class RosuFFI {
             // 创建临时文件
             File tempFile = File.createTempFile("native", libName.substring(libName.lastIndexOf('.')));
             tempFile.deleteOnExit();
+
             // 将资源写入临时文件
             Files.copy(input, tempFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             input.close();
@@ -201,7 +236,25 @@ public class RosuFFI {
 
         public static native int beatmap_mode(Pointer context);
 
+        public static native int beatmap_version(Pointer context);
+
         public static native boolean beatmap_is_convert(Pointer context);
+
+        public static native float beatmap_stack_leniency(Pointer context);
+
+        public static native float beatmap_ar(Pointer context);
+
+        public static native float beatmap_cs(Pointer context);
+
+        public static native float beatmap_hp(Pointer context);
+
+        public static native float beatmap_od(Pointer context);
+
+        public static native double beatmap_slider_multiplier(Pointer context);
+
+        public static native double beatmap_slider_tick_rate(Pointer context);
+
+        public static native OptionTooSuspicious.ByValue beatmap_check_suspicious(Pointer context);
 
         /// Destroys the given instance.
         ///
@@ -258,7 +311,7 @@ public class RosuFFI {
         public static native int performance_s_mods(Pointer context, String str);
 
         public static native void performance_passed_objects(Pointer context, long passed_objects);
-        
+
         public static native void performance_legacy_total_score(Pointer context, long legacy_total_score);
 
         public static native void performance_clock_rate(Pointer context, double clock_rate);
@@ -311,7 +364,7 @@ public class RosuFFI {
 
         public static native double performance_get_clock_rate(Pointer context);
 
-        
+
         /// Destroys the given instance.
         ///
         /// # Safety
@@ -326,9 +379,9 @@ public class RosuFFI {
         /// Create a [GradualDifficulty] for a [Beatmap] on a specific [GameMode].
         public static native int gradual_difficulty_new_with_mode(PointerByReference context, Pointer difficulty, Pointer beatmap, int mode);
 
-        public static native OptionDifficultyAttributes.ByValue gradual_difficulty_next(Pointer context);
+        public static native OptionDifficultyAttributes gradual_difficulty_next(Pointer context);
 
-        public static native OptionDifficultyAttributes.ByValue gradual_difficulty_nth(Pointer context, long n);
+        public static native OptionDifficultyAttributes gradual_difficulty_nth(Pointer context, long n);
 
         public static native long gradual_difficulty_len(Pointer context);
 
@@ -348,18 +401,18 @@ public class RosuFFI {
 
         /// Process the next hit object and calculate the performance attributes
         /// for the resulting score state.
-        public static native OptionPerformanceAttributes.ByValue gradual_performance_next(Pointer context, ScoreState.ByValue state);
+        public static native OptionPerformanceAttributes gradual_performance_next(Pointer context, ScoreState.ByValue state);
 
         /// Process all remaining hit objects and calculate the final performance
         /// attributes.
-        public static native OptionPerformanceAttributes.ByValue gradual_performance_last(Pointer context, ScoreState.ByValue state);
+        public static native OptionPerformanceAttributes gradual_performance_last(Pointer context, ScoreState.ByValue state);
 
-        /// Process everything up to the next nth hitobject and calculate the
+        /// Process everything up to the next `n`th hitobject and calculate the
         /// performance attributes for the resulting score state.
         ///
-        /// Note that the count is zero-indexed, so n=0 will process 1 object,
-        /// n=1 will process 2, and so on.
-        public static native OptionPerformanceAttributes.ByValue gradual_performance_nth(Pointer context, ScoreState.ByValue state, long n);
+        /// Note that the count is zero-indexed, so `n=0` will process 1 object,
+        /// `n=1` will process 2, and so on.
+        public static native OptionPerformanceAttributes gradual_performance_nth(Pointer context, ScoreState.ByValue state, long n);
 
         /// Returns the amount of remaining objects.
         public static native long gradual_performance_len(Pointer context);
@@ -450,6 +503,19 @@ public class RosuFFI {
         }
 
         @Structure.FieldOrder({"t", "is_some"})
+        public static class OptionTooSuspicious extends Structure {
+            public int t;
+            public byte is_some;
+
+            public static class ByReference extends OptionTooSuspicious implements Structure.ByReference {}
+            public static class ByValue extends OptionTooSuspicious implements Structure.ByValue {}
+
+            public Optional<TooSuspicious> toOptional() {
+                return is_some == 1 ? Optional.of(TooSuspicious.fromValue(t)) : Optional.empty();
+            }
+        }
+
+        @Structure.FieldOrder({"t", "is_some"})
         public static class Optionf64 extends Structure {
             public double t;
             public byte is_some;
@@ -502,9 +568,9 @@ public class RosuFFI {
         }
 
         @Structure.FieldOrder({ "aim", "aim_difficult_slider_count", "speed", "flashlight", "slider_factor",
-            "aim_top_weighted_slider_factor", "speed_top_weighted_slider_factor",
-            "speed_note_count", "aim_difficult_strain_count", "speed_difficult_strain_count",
-            "nested_score_per_object", "legacy_score_base_multiplier", "maximum_legacy_combo_score",
+                "aim_top_weighted_slider_factor", "speed_top_weighted_slider_factor",
+                "speed_note_count", "aim_difficult_strain_count", "speed_difficult_strain_count",
+                "nested_score_per_object", "legacy_score_base_multiplier", "maximum_legacy_combo_score",
                 "ar", "great_hit_window", "ok_hit_window", "meh_hit_window", "hp",
                 "n_circles", "n_sliders", "n_large_ticks", "n_spinners",
                 "stars", "max_combo" })
@@ -539,9 +605,9 @@ public class RosuFFI {
         }
 
         @Structure.FieldOrder({ "difficulty", "pp", "pp_acc", "pp_aim",
-            "pp_flashlight", "pp_speed", "effective_miss_count", "speed_deviation",
-            "combo_based_estimated_miss_count", "score_based_estimated_miss_count",
-            "aim_estimated_slider_breaks", "speed_estimated_slider_breaks" })
+                "pp_flashlight", "pp_speed", "effective_miss_count", "speed_deviation",
+                "combo_based_estimated_miss_count", "score_based_estimated_miss_count",
+                "aim_estimated_slider_breaks", "speed_estimated_slider_breaks" })
         public static class OsuPerformanceAttributes extends Structure {
             public OsuDifficultyAttributes difficulty; // Nested structure for difficulty attributes
             public double pp;                          // Final performance points
@@ -561,8 +627,8 @@ public class RosuFFI {
         }
 
         @Structure.FieldOrder({ "stamina", "rhythm", "color", "reading",
-            "great_hit_window", "ok_hit_window", "mono_stamina_factor",
-            "mechanical_difficulty", "consistency_factor",
+                "great_hit_window", "ok_hit_window", "mono_stamina_factor",
+                "mechanical_difficulty", "consistency_factor",
                 "stars", "max_combo", "is_convert" })
         public static class TaikoDifficultyAttributes extends Structure {
             public double stamina;               // Difficulty of the stamina skill
@@ -583,7 +649,7 @@ public class RosuFFI {
         }
 
         @Structure.FieldOrder({ "difficulty", "pp", "pp_acc", "pp_difficulty",
-            "estimated_unstable_rate" })
+                "estimated_unstable_rate" })
         public static class TaikoPerformanceAttributes extends Structure {
             public TaikoDifficultyAttributes difficulty;   // Difficulty attributes used for performance calculation
             public double pp;                              // Final performance points
@@ -769,7 +835,7 @@ public class RosuFFI {
 
         @Structure.FieldOrder({ "ar", "od_perfect", "od_great", "od_good", "od_ok", "od_meh" })
         public static class HitWindows extends Structure {
-            /// Hit window for approach rate i.e. TimePreempt in milliseconds.
+            /// Hit window for approach rate i.e. `TimePreempt` in milliseconds.
             public Optionf64 ar;
             /// Hit window for overall difficulty i.e. time to hit a "Perfect" in milliseconds.
             public Optionf64 od_perfect;
@@ -790,8 +856,8 @@ public class RosuFFI {
         public static class BeatmapAttributes extends Structure {
             public double ar;         // Approach rate
             public double od;         // Overall difficulty
-            public double cs;         // Circle size
-            public double hp;         // Health drain rate
+            public float cs;          // Circle size
+            public float hp;          // Health drain rate
             public double clock_rate; // Clock rate with respect to mods
             public HitWindows hit_windows; // Nested hit windows structure
 
@@ -800,16 +866,16 @@ public class RosuFFI {
         }
 
         @Structure.FieldOrder({ "max_combo", "osu_large_tick_hits", "osu_small_tick_hits", "slider_end_hits",
-            "n_geki", "n_katu", "n300", "n100", "n50", "misses", "legacy_total_score" })
+                "n_geki", "n_katu", "n300", "n100", "n50", "misses", "legacy_total_score" })
         public static class ScoreState extends Structure {
             public int max_combo;            // Maximum combo (unsigned int -> int)
             /// "Large tick" hits for osu!standard.
             ///
             /// The meaning depends on the kind of score:
-            /// - if set on osu!stable, this field is irrelevant and can be 0
-            /// - if set on osu!lazer *without* CL, this field is the amount of hit
+            /// - if set on osu!stable, this field is irrelevant and can be `0`
+            /// - if set on osu!lazer *without* `CL`, this field is the amount of hit
             ///   slider ticks and repeats
-            /// - if set on osu!lazer *with* CL, this field is the amount of hit
+            /// - if set on osu!lazer *with* `CL`, this field is the amount of hit
             ///   slider heads, ticks, and repeats
             ///
             /// Only relevant for osu!lazer.
@@ -898,9 +964,54 @@ public class RosuFFI {
             return Mode.fromValue(RosuPPLib.beatmap_mode(getContext()));
         }
 
+        // Get the version of the Beatmap
+        public int version() {
+            return RosuPPLib.beatmap_version(getContext());
+        }
+
         // Check if the Beatmap is a converted map
         public boolean isConvert() {
             return RosuPPLib.beatmap_is_convert(getContext());
+        }
+
+        // Get the stack leniency of the Beatmap
+        public float stackLeniency() {
+            return RosuPPLib.beatmap_stack_leniency(getContext());
+        }
+
+        // Get the AR of the Beatmap
+        public float ar() {
+            return RosuPPLib.beatmap_ar(getContext());
+        }
+
+        // Get the CS of the Beatmap
+        public float cs() {
+            return RosuPPLib.beatmap_cs(getContext());
+        }
+
+        // Get the HP of the Beatmap
+        public float hp() {
+            return RosuPPLib.beatmap_hp(getContext());
+        }
+
+        // Get the OD of the Beatmap
+        public float od() {
+            return RosuPPLib.beatmap_od(getContext());
+        }
+
+        // Get the slider multiplier of the Beatmap
+        public double sliderMultiplier() {
+            return RosuPPLib.beatmap_slider_multiplier(getContext());
+        }
+
+        // Get the slider tick rate of the Beatmap
+        public double sliderTickRate() {
+            return RosuPPLib.beatmap_slider_tick_rate(getContext());
+        }
+
+        // Check if the Beatmap is suspicious
+        public RosuPPLib.OptionTooSuspicious checkSuspicious() {
+            return RosuPPLib.beatmap_check_suspicious(getContext());
         }
 
         // Getter for the context
@@ -1300,7 +1411,7 @@ public class RosuFFI {
             return m;
         }
 
-        /// Create a [GradualDifficulty] for a [Beatmap] on a specific [GameMode].
+         /// Create a [GradualDifficulty] for a [Beatmap] on a specific [GameMode].
         public static GradualDifficulty NewWithMode(Difficulty difficulty, Beatmap beatmap, Mode mode) throws FFIException {
             var m = new GradualDifficulty();
             int rval = RosuPPLib.gradual_difficulty_new_with_mode(m._context, difficulty.getContext(), beatmap.getContext(), mode.getValue());
@@ -1310,11 +1421,11 @@ public class RosuFFI {
             return m;
         }
 
-        public RosuPPLib.OptionDifficultyAttributes.ByValue Next() {
+        public RosuPPLib.OptionDifficultyAttributes Next() {
             return RosuPPLib.gradual_difficulty_next(getContext());
         }
 
-        public RosuPPLib.OptionDifficultyAttributes.ByValue Nth(long n) {
+        public RosuPPLib.OptionDifficultyAttributes Nth(long n) {
             return RosuPPLib.gradual_difficulty_nth(getContext(), n);
         }
 
@@ -1371,15 +1482,15 @@ public class RosuFFI {
             return m;
         }
 
-        public RosuPPLib.OptionPerformanceAttributes.ByValue Next(RosuPPLib.ScoreState state) {
+        public RosuPPLib.OptionPerformanceAttributes Next(RosuPPLib.ScoreState state) {
             return RosuPPLib.gradual_performance_next(getContext(), (RosuPPLib.ScoreState.ByValue)state);
         }
 
-        public RosuPPLib.OptionPerformanceAttributes.ByValue Last(RosuPPLib.ScoreState state) {
+        public RosuPPLib.OptionPerformanceAttributes Last(RosuPPLib.ScoreState state) {
             return RosuPPLib.gradual_performance_last(getContext(), (RosuPPLib.ScoreState.ByValue)state);
         }
 
-        public RosuPPLib.OptionPerformanceAttributes.ByValue Nth(long n, RosuPPLib.ScoreState state) {
+        public RosuPPLib.OptionPerformanceAttributes Nth(long n, RosuPPLib.ScoreState state) {
             return RosuPPLib.gradual_performance_nth(getContext(), (RosuPPLib.ScoreState.ByValue)state, n);
         }
 
