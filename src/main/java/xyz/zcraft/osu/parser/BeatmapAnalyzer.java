@@ -3,17 +3,18 @@ package xyz.zcraft.osu.parser;
 import desu.life.RosuFFI;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
-import xyz.zcraft.osu.parser.data.beatmap.WindowDifficulty;
+import org.jetbrains.annotations.NotNull;
+import xyz.zcraft.osu.parser.data.beatmap.DifficultyAttribute;
 import xyz.zcraft.osu.parser.data.beatmap.HitObject;
 import xyz.zcraft.osu.parser.data.beatmap.OsuBeatmap;
+import xyz.zcraft.osu.parser.data.beatmap.WindowDifficulty;
 import xyz.zcraft.osu.parser.exception.AnalyzeException;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class BeatmapAnalyzer {
     public static WindowDifficulty getDifficultyPeak(OsuBeatmap osuBeatmap) {
@@ -56,32 +57,129 @@ public class BeatmapAnalyzer {
         return difficulties;
     }
 
+    private static final ConcurrentHashMap<Long, Path> tempBeatmaps = new ConcurrentHashMap<>();
+
     public static Pair<Double, Double> calculateWindowDifficulty(OsuBeatmap osuBeatmap, long startTimeMs, long endTimeMs) {
+        String beatmapStr = osuBeatmap.toWindowedBeatmapString(startTimeMs, endTimeMs) + "\0";
+
+        byte[] pinnedBytes = beatmapStr.getBytes(java.nio.charset.StandardCharsets.UTF_8);
         try {
-            final Path tempFile = Files.createTempFile("osu-parser-beatmap-temp", ".osu");
-            tempFile.toFile().deleteOnExit();
-            Files.writeString(tempFile, osuBeatmap.toWindowedBeatmapString(startTimeMs, endTimeMs));
+//            final Path tempFile = Files.createTempFile("osu-parser-beatmap-temp", ".osu");
+//            tempFile.toFile().deleteOnExit();
+//            Files.writeString(tempFile, osuBeatmap.toWindowedBeatmapString(startTimeMs, endTimeMs));
             try (
-                    desu.life.RosuFFI.Beatmap beatmap = new desu.life.RosuFFI.Beatmap(tempFile.toAbsolutePath().toString());
+                    desu.life.RosuFFI.Beatmap beatmap = new desu.life.RosuFFI.Beatmap(pinnedBytes);
                     desu.life.RosuFFI.Difficulty diff = new desu.life.RosuFFI.Difficulty();
                     desu.life.RosuFFI.Performance performance = new RosuFFI.Performance()
             ) {
                 final double stars = diff.calculate(beatmap).osu.t.stars;
                 final double pp = performance.calculate(beatmap).osu.t.pp;
 
-                Files.deleteIfExists(tempFile);
+//                Files.deleteIfExists(tempFile);
                 return new ImmutablePair<>(stars, pp);
             } catch (RosuFFI.FFIException e) {
                 throw new RuntimeException(e);
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             throw new RuntimeException("Failed to calculate window difficulty", e);
         }
-
-
     }
 
-    public static List<Long> extractTimestamps(OsuBeatmap beatmap) {
+    private static List<Long> extractTimestamps(OsuBeatmap beatmap) {
         return beatmap.getHitObjects().stream().map(HitObject::getTime).toList();
+    }
+
+    public static @NotNull DifficultyAttribute calculateDifficulty(OsuBeatmap beatmap, long mods) {
+        boolean hasEZ = (mods & 2) > 0;
+        boolean hasHR = (mods & 16) > 0;
+        boolean hasDT = (mods & 64) > 0;
+        boolean hasHT = (mods & 256) > 0;
+        boolean hasNC = (mods & 512) > 0;
+
+        double cs = beatmap.getCs();
+        double od = beatmap.getOd();
+        double ar = beatmap.getAr();
+        double hp = beatmap.getHp();
+
+        double approachTime = ar >= 5 ? (1200 - 150 * (ar - 5)) : (1800 - 120 * ar);
+
+        if (hasHR) {
+            cs = Math.min(10.0, cs * 1.3);
+            od = Math.min(10.0, od * 1.4);
+            hp = Math.min(10.0, hp * 1.4);
+        } else if (hasEZ) {
+            cs = cs * 0.5;
+            od = od * 0.5;
+            hp = hp * 0.5;
+        }
+
+        double clockRate = 1.0;
+        if (hasDT || hasNC) {
+            clockRate = 1.5;
+        } else if (hasHT) {
+            clockRate = 0.75;
+        }
+
+        approachTime = approachTime / clockRate;
+
+        if (approachTime > 1200) {
+            ar = (1800 - approachTime) / 120;
+        } else {
+            ar = 5 + (1200 - approachTime) / 150;
+        }
+
+        double window = (80.0 - (6.0 * od)) / clockRate;
+        od = (80.0 - window) / 6;
+
+        return new DifficultyAttribute(cs, od, ar, hp, beatmap.getOd(), clockRate);
+    }
+
+    public static double calculateBpm(OsuBeatmap beatmap, long mods) {
+        boolean hasDT = (mods & 64) > 0;
+        boolean hasHT = (mods & 256) > 0;
+        boolean hasNC = (mods & 512) > 0;
+
+        double clockRate = 1.0;
+        if (hasDT || hasNC) {
+            clockRate = 1.5;
+        } else if (hasHT) {
+            clockRate = 0.75;
+        }
+
+        final List<OsuBeatmap.TimingPoint> timingPoints = beatmap.getTimingPoints()
+                .stream()
+                .filter(tp -> tp.uninherited() == 1)
+                .toList();
+
+        if (timingPoints.isEmpty()) return 0.0;
+
+        Map<Double, Long> bpmDurations = new HashMap<>();
+
+        double previousBpm = 0;
+        long previousBpmStartTime = 0;
+
+        for (OsuBeatmap.TimingPoint tp : timingPoints) {
+            double currentBpm = Math.round((60000.0 / tp.beatLength()) * 100.0) / 100.0;
+
+            if (previousBpm > 0) {
+                long duration = tp.time() - previousBpmStartTime;
+                bpmDurations.put(previousBpm, bpmDurations.getOrDefault(previousBpm, 0L) + duration);
+            }
+
+            previousBpm = currentBpm;
+            previousBpmStartTime = tp.time();
+        }
+
+        if (previousBpm > 0 && !beatmap.getHitObjects().isEmpty()) {
+            long finalObjectTime = beatmap.getHitObjects().getLast().getTime();
+            long finalDuration = Math.max(0, finalObjectTime - previousBpmStartTime);
+            bpmDurations.put(previousBpm, bpmDurations.getOrDefault(previousBpm, 0L) + finalDuration);
+        }
+
+        return bpmDurations.entrySet()
+                .stream()
+                .max(Map.Entry.comparingByValue())
+                .map(Map.Entry::getKey)
+                .orElse(0.0) * clockRate;
     }
 }

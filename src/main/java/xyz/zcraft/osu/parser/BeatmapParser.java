@@ -1,6 +1,5 @@
 package xyz.zcraft.osu.parser;
 
-import xyz.zcraft.osu.parser.data.beatmap.DifficultyAttribute;
 import xyz.zcraft.osu.parser.data.beatmap.HitObject;
 import xyz.zcraft.osu.parser.data.beatmap.OsuBeatmap;
 import xyz.zcraft.osu.parser.exception.ParseException;
@@ -50,15 +49,15 @@ public class BeatmapParser {
                     if ((line.isEmpty() || line.startsWith("//")) && !"[Events]".equals(currentSection)) continue;
 
                     switch (currentSection) {
-                        case "[General]" -> parseGeneralLine(beatmap, line);
-                        case "[Editor]" -> parseEditorLine(beatmap, line);
-                        case "[Metadata]" -> parseMetadataLine(beatmap, line);
-                        case "[Difficulty]" -> parseDifficultyLine(beatmap, line);
+                        case "[General]" -> BeatmapFileParser.parseGeneralLine(beatmap, line);
+                        case "[Editor]" -> BeatmapFileParser.parseEditorLine(beatmap, line);
+                        case "[Metadata]" -> BeatmapFileParser.parseMetadataLine(beatmap, line);
+                        case "[Difficulty]" -> BeatmapFileParser.parseDifficultyLine(beatmap, line);
                         case "[Events]" ->
-                                currentStoryboardSection = parseStoryboardLine(beatmap, line, currentStoryboardSection);
-                        case "[TimingPoints]" -> parseTimingPointsLine(beatmap, line);
-                        case "[Colours]" -> parseColoursLine(beatmap, line);
-                        case "[HitObjects]" -> parseHitObjectLine(beatmap, line);
+                                currentStoryboardSection = BeatmapFileParser.parseStoryboardLine(beatmap, line, currentStoryboardSection);
+                        case "[TimingPoints]" -> BeatmapFileParser.parseTimingPointsLine(beatmap, line);
+                        case "[Colours]" -> BeatmapFileParser.parseColoursLine(beatmap, line);
+                        case "[HitObjects]" -> BeatmapFileParser.parseHitObjectLine(beatmap, line);
                     }
                 }
             }
@@ -67,8 +66,10 @@ public class BeatmapParser {
             throw new ParseException("Cannot parse beatmap", e);
         }
     }
+}
 
-    private static void parseDifficultyLine(OsuBeatmap beatmap, String line) {
+class BeatmapFileParser {
+    static void parseDifficultyLine(OsuBeatmap beatmap, String line) {
         String[] kv = line.split(":", 2);
         if (kv.length < 2) return;
 
@@ -85,7 +86,7 @@ public class BeatmapParser {
         }
     }
 
-    private static void parseGeneralLine(OsuBeatmap beatmap, String line) {
+    static void parseGeneralLine(OsuBeatmap beatmap, String line) {
         String[] kv = line.split(":", 2);
         if (kv.length < 2) return;
 
@@ -112,7 +113,7 @@ public class BeatmapParser {
         }
     }
 
-    private static void parseEditorLine(OsuBeatmap beatmap, String line) {
+    static void parseEditorLine(OsuBeatmap beatmap, String line) {
         String[] kv = line.split(":", 2);
         if (kv.length < 2) return;
 
@@ -128,7 +129,7 @@ public class BeatmapParser {
         }
     }
 
-    private static String parseStoryboardLine(OsuBeatmap beatmap, String line, String section) {
+    static String parseStoryboardLine(OsuBeatmap beatmap, String line, String section) {
         if (line.startsWith("//")) {
             return line;
         }
@@ -181,8 +182,7 @@ public class BeatmapParser {
         return section;
     }
 
-
-    private static void parseMetadataLine(OsuBeatmap beatmap, String line) {
+    static void parseMetadataLine(OsuBeatmap beatmap, String line) {
         String[] kv = line.split(":", 2);
 
         String key = kv[0].trim();
@@ -202,7 +202,7 @@ public class BeatmapParser {
         }
     }
 
-    private static void parseHitObjectLine(OsuBeatmap beatmap, String line) {
+    static void parseHitObjectLine(OsuBeatmap beatmap, String line) {
         HitObject obj = new HitObject();
         obj.setRawData(line);
         String[] parts = line.split(",");
@@ -237,7 +237,7 @@ public class BeatmapParser {
         beatmap.getHitObjects().add(obj);
     }
 
-    private static void parseTimingPointsLine(OsuBeatmap beatmap, String line) {
+    static void parseTimingPointsLine(OsuBeatmap beatmap, String line) {
         final String[] split = line.split(",");
         beatmap.getTimingPoints().add(
                 new OsuBeatmap.TimingPoint(
@@ -252,7 +252,7 @@ public class BeatmapParser {
                 ));
     }
 
-    private static void parseColoursLine(OsuBeatmap beatmap, String line) {
+    static void parseColoursLine(OsuBeatmap beatmap, String line) {
         final String[] kv = line.split(":");
         final String[] rgb = kv[1].split(",");
 
@@ -298,50 +298,5 @@ public class BeatmapParser {
         } catch (Exception e) {
             return List.of();
         }
-    }
-
-    public static DifficultyAttribute calculateDifficulty(OsuBeatmap beatmap, long mods) {
-        boolean hasEZ = (mods & 2) > 0;
-        boolean hasHR = (mods & 16) > 0;
-        boolean hasDT = (mods & 64) > 0;
-        boolean hasHT = (mods & 256) > 0;
-        boolean hasNC = (mods & 512) > 0;
-
-        double cs = beatmap.getCs();
-        double od = beatmap.getOd();
-        double ar = beatmap.getAr();
-        double hp = beatmap.getHp();
-
-        double approachTime = ar >= 5 ? (1200 - 150 * (ar - 5)) : (1800 - 120 * ar);
-
-        if (hasHR) {
-            cs = Math.min(10.0, cs * 1.3);
-            od = Math.min(10.0, od * 1.4);
-            hp = Math.min(10.0, hp * 1.4);
-        } else if (hasEZ) {
-            cs = cs * 0.5;
-            od = od * 0.5;
-            hp = hp * 0.5;
-        }
-
-        double clockRate = 1.0;
-        if (hasDT || hasNC) {
-            clockRate = 1.5;
-        } else if (hasHT) {
-            clockRate = 0.75;
-        }
-
-        approachTime = approachTime / clockRate;
-
-        if (approachTime > 1200) {
-            ar = (1800 - approachTime) / 120;
-        } else {
-            ar = 5 + (1200 - approachTime) / 150;
-        }
-
-        double window = (80.0 - (6.0 * od)) / clockRate;
-        od = (80.0 - window) / 6;
-
-        return new DifficultyAttribute(cs, od, ar, hp, beatmap.getOd(), clockRate);
     }
 }

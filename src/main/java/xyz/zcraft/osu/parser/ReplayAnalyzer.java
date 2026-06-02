@@ -23,7 +23,7 @@ public class ReplayAnalyzer {
             throw new ParseException("Beatmap hash mismatch");
         }
 
-        final DifficultyAttribute diff = BeatmapParser.calculateDifficulty(beatmap, replay.mods());
+        final DifficultyAttribute diff = BeatmapAnalyzer.calculateDifficulty(beatmap, replay.mods());
 
         final double circleRadius = diff.getCircleRadiusInPixel();
 

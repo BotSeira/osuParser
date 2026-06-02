@@ -24,6 +24,7 @@ import java.util.LinkedList;
 public class OsuParser {
     private static final Gson GSON = new Gson();
 
+    @Deprecated
     public static DiffSpec getDiffSpecForMap(BeatmapExtended beatmap, Path beatmapFile, String mod) {
         try (final RosuFFI.Beatmap rosuBeatmap = new RosuFFI.Beatmap(beatmapFile.toAbsolutePath().toString());
              final RosuFFI.Performance perf = new RosuFFI.Performance()
@@ -91,13 +92,88 @@ public class OsuParser {
             diffSpec.setMods(modList);
             diffSpec.setMaxCombo(scoreState.max_combo);
 
-            diffSpec.setDifficulty(BeatmapParser.calculateDifficulty(osuBeatmap, mods.getBits()));
+            diffSpec.setDifficulty(BeatmapAnalyzer.calculateDifficulty(osuBeatmap, mods.getBits()));
 
             return diffSpec;
         } catch (RosuFFI.FFIException | ParseException e) {
             throw new RuntimeException(e);
         }
     }
+
+//    public static DiffSpec getDiffSpecForMap(OsuBeatmap beatmap, String mod) {
+//        try (final RosuFFI.Beatmap rosuBeatmap = new RosuFFI.Beatmap(beatmapFile.toAbsolutePath().toString());
+//             final RosuFFI.Performance perf = new RosuFFI.Performance()
+//        ) {
+//            final OsuBeatmap osuBeatmap = BeatmapParser.parseBeatmap(beatmapFile);
+//
+//            final DiffSpec diffSpec = new DiffSpec();
+//
+//            final RosuFFI.Mods mods = RosuFFI.Mods.fromAcronyms(mod == null ? "" : mod, RosuFFI.Mode.Osu);
+//
+//            mods.removeUnknownMods();
+//            mods.sanitize();
+//
+//            perf.setMods(mods);
+//
+//            perf.setAccuracy(98.0);
+//            perf.setMisses(0);
+//
+//            var calc = perf.calculate(rosuBeatmap);
+//            diffSpec.setPpFC(calc.osu.t.pp);
+//
+//            perf.setAccuracy(95.0);
+//
+//            calc = perf.calculate(rosuBeatmap);
+//            diffSpec.setPp95(calc.osu.t.pp);
+//
+//            perf.setAccuracy(100.0);
+//            perf.setMisses(0);
+//
+//            calc = perf.calculate(rosuBeatmap);
+//            diffSpec.setPpSS(calc.osu.t.pp);
+//
+//            final RosuFFI.RosuPPLib.ScoreState scoreState = perf.generateState(rosuBeatmap);
+//
+//            final var attr = calc.osu.t.difficulty;
+//            diffSpec.setAim(attr.aim);
+//            diffSpec.setSpeed(attr.speed);
+//
+//            diffSpec.setBpm(beatmap.getBpm());
+//            diffSpec.setLength(beatmap.getHitLength());
+//            diffSpec.setTotalLength(beatmap.getTotalLength());
+//            diffSpec.setStar(calc.osu.t.difficulty.stars);
+//
+//            if (mod != null && !mod.isEmpty()) {
+//                diffSpec.setModStr(mod);
+//                diffSpec.setModded(true);
+//            }
+//
+//            if (mods.contains("DT") || mods.contains("NC")) {
+//                diffSpec.setBpm(diffSpec.getBpm() * 1.5);
+//                diffSpec.setLength(diffSpec.getLength() / 1.5);
+//                diffSpec.setTotalLength(diffSpec.getTotalLength() / 1.5);
+//            } else if (mods.contains("HT") || mods.contains("DC")) {
+//                diffSpec.setBpm(diffSpec.getBpm() * 0.75);
+//                diffSpec.setLength(diffSpec.getLength() / 0.75);
+//                diffSpec.setTotalLength(diffSpec.getTotalLength() / 0.75);
+//            }
+//
+//            final LinkedList<Mod> modList = new LinkedList<>();
+//
+//            for (JsonElement jsonElement : JsonParser.parseString(mods.toJson().toString()).getAsJsonArray().asList()) {
+//                modList.add(GSON.fromJson(jsonElement, Mod.class));
+//            }
+//
+//            diffSpec.setMods(modList);
+//            diffSpec.setMaxCombo(scoreState.max_combo);
+//
+//            diffSpec.setDifficulty(BeatmapAnalyzer.calculateDifficulty(osuBeatmap, mods.getBits()));
+//
+//            return diffSpec;
+//        } catch (RosuFFI.FFIException | ParseException e) {
+//            throw new RuntimeException(e);
+//        }
+//    }
 
     public static double estimatePp(Score score, OsuBeatmap beatmap) {
         try {
