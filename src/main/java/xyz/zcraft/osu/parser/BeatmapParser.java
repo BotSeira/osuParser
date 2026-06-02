@@ -33,6 +33,7 @@ public class BeatmapParser {
             }
 
             String currentSection = "";
+            String currentStoryboardSection = "";
 
             try (BufferedReader reader = new BufferedReader(new FileReader(beatmapPath.toFile()))) {
                 String line;
@@ -40,19 +41,21 @@ public class BeatmapParser {
                 while ((line = reader.readLine()) != null) {
                     line = line.trim();
 
-                    if (line.isEmpty() || line.startsWith("//")) continue;
 
                     if (line.startsWith("[") && line.endsWith("]")) {
                         currentSection = line;
                         continue;
                     }
 
+                    if ((line.isEmpty() || line.startsWith("//")) && !"[Events]".equals(currentSection)) continue;
+
                     switch (currentSection) {
                         case "[General]" -> parseGeneralLine(beatmap, line);
                         case "[Editor]" -> parseEditorLine(beatmap, line);
                         case "[Metadata]" -> parseMetadataLine(beatmap, line);
                         case "[Difficulty]" -> parseDifficultyLine(beatmap, line);
-                        case "[Events]" -> {} // Ignored for now
+                        case "[Events]" ->
+                                currentStoryboardSection = parseStoryboardLine(beatmap, line, currentStoryboardSection);
                         case "[TimingPoints]" -> parseTimingPointsLine(beatmap, line);
                         case "[Colours]" -> parseColoursLine(beatmap, line);
                         case "[HitObjects]" -> parseHitObjectLine(beatmap, line);
@@ -98,7 +101,14 @@ public class BeatmapParser {
             case "StackLeniency" -> beatmap.setStackLeniency(parseDoubleSafe(value));
             case "Mode" -> beatmap.setMode(parseIntSafe(value));
             case "LetterboxInBreaks" -> beatmap.setLetterboxInBreaks(parseIntSafe(value));
+            case "UseSkinSprites" -> beatmap.setUseSkinSprites(parseIntSafe(value));
+            case "OverlayPosition" -> beatmap.setOverlayPosition(value);
+            case "SkinPreference" -> beatmap.setSkinPreference(value);
+            case "EpilepsyWarning" -> beatmap.setEpilepsyWarning(parseIntSafe(value));
+            case "CountdownOffset" -> beatmap.setCountdownOffset(parseIntSafe(value));
+            case "SpecialStyle" -> beatmap.setSpecialStyle(parseIntSafe(value));
             case "WidescreenStoryboard" -> beatmap.setWidescreenStoryboard(parseIntSafe(value));
+            case "SamplesMatchPlaybackRate" -> beatmap.setSamplesMatchPlaybackRate(parseIntSafe(value));
         }
     }
 
@@ -110,13 +120,67 @@ public class BeatmapParser {
         String value = kv[1].trim();
 
         switch (key) {
-            case "Bookmark" -> beatmap.setBookmarks(parseLongListSafe(value));
+            case "Bookmarks" -> beatmap.setBookmarks(parseLongListSafe(value));
             case "DistanceSpacing" -> beatmap.setDistanceSpacing(parseDoubleSafe(value));
             case "BeatDivisor" -> beatmap.setBeatDivisor(parseIntSafe(value));
             case "GridSize" -> beatmap.setGridSize(parseIntSafe(value));
             case "TimelineZoom" -> beatmap.setTimelineZoom(parseDoubleSafe(value));
         }
     }
+
+    private static String parseStoryboardLine(OsuBeatmap beatmap, String line, String section) {
+        if (line.startsWith("//")) {
+            return line;
+        }
+
+        if ("//Background and Video events".equals(section) && line.startsWith("0,")) {
+            String[] kv = line.split(",");
+            if (kv.length == 5) {
+                beatmap.getBgAndVideoEvents().add(new OsuBeatmap.Event.BackgroundEvent(
+                        parseLongSafe(kv[1]),
+                        kv[2],
+                        parseIntSafe(kv[3]),
+                        parseIntSafe(kv[4])
+                ));
+            }
+        } else if ("//Background and Video events".equals(section) && (line.startsWith("1,") || line.startsWith("Video,"))) {
+            String[] kv = line.split(",");
+            if (kv.length == 5) {
+                beatmap.getBgAndVideoEvents().add(new OsuBeatmap.Event.VideoEvent(
+                        parseLongSafe(kv[1]),
+                        kv[2],
+                        parseIntSafe(kv[3]),
+                        parseIntSafe(kv[4])
+                ));
+            }
+        } else if ("//Break Periods".equals(section) && (line.startsWith("2,") || line.startsWith("Break,"))) {
+            String[] kv = line.split(",");
+            if (kv.length == 3) {
+                beatmap.getBreakEvents().add(new OsuBeatmap.Event.BreakEvent(
+                        parseLongSafe(kv[1]),
+                        parseLongSafe(kv[2])
+                ));
+            }
+        } else {
+            switch (section) {
+                case "//Storyboard Layer 0 (Background)" ->
+                        beatmap.getStoryBoardLayer0().add(new OsuBeatmap.Event.StoryboardEvent(line));
+                case "//Storyboard Layer 1 (Fail)" ->
+                        beatmap.getStoryBoardLayer1().add(new OsuBeatmap.Event.StoryboardEvent(line));
+                case "//Storyboard Layer 2 (Pass)" ->
+                        beatmap.getStoryBoardLayer2().add(new OsuBeatmap.Event.StoryboardEvent(line));
+                case "//Storyboard Layer 3 (Foreground)" ->
+                        beatmap.getStoryBoardLayer3().add(new OsuBeatmap.Event.StoryboardEvent(line));
+                case "//Storyboard Layer 4 (Overlay)" ->
+                        beatmap.getStoryBoardLayer4().add(new OsuBeatmap.Event.StoryboardEvent(line));
+                case "//Storyboard Sound Samples" ->
+                        beatmap.getAudioSampleEvents().add(new OsuBeatmap.Event.StoryboardEvent(line));
+            }
+        }
+
+        return section;
+    }
+
 
     private static void parseMetadataLine(OsuBeatmap beatmap, String line) {
         String[] kv = line.split(":", 2);
@@ -132,7 +196,7 @@ public class BeatmapParser {
             case "Creator" -> beatmap.setCreator(value);
             case "Version" -> beatmap.setVersion(value);
             case "Source" -> beatmap.setSource(value);
-            case "Tags" -> beatmap.setTags(value);
+            case "Tags" -> beatmap.setTags(List.of(value.split(",")));
             case "BeatmapID" -> beatmap.setBeatmapId(parseLongSafe(value));
             case "BeatmapSetID" -> beatmap.setBeatmapSetId(parseLongSafe(value));
         }
@@ -196,27 +260,30 @@ public class BeatmapParser {
         beatmap.getColours().add(c);
     }
 
-    private static long parseLongSafe(String value) {
+    private static Long parseLongSafe(String value) {
+        if (value == null) return null;
         try {
-            return Long.parseLong(value);
+            return Long.parseLong(value.trim());
         } catch (NumberFormatException e) {
-            return 0;
+            return null;
         }
     }
 
-    private static int parseIntSafe(String value) {
+    private static Integer parseIntSafe(String value) {
+        if (value == null) return null;
         try {
-            return Integer.parseInt(value);
+            return Integer.parseInt(value.trim());
         } catch (NumberFormatException e) {
-            return 0;
+            return null;
         }
     }
 
-    private static double parseDoubleSafe(String value) {
+    private static Double parseDoubleSafe(String value) {
+        if (value == null) return null;
         try {
-            return Double.parseDouble(value);
+            return Double.parseDouble(value.trim());
         } catch (NumberFormatException e) {
-            return 0;
+            return null;
         }
     }
 
