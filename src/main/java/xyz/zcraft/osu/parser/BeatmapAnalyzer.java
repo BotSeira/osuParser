@@ -60,22 +60,19 @@ public class BeatmapAnalyzer {
     private static final ConcurrentHashMap<Long, Path> tempBeatmaps = new ConcurrentHashMap<>();
 
     public static Pair<Double, Double> calculateWindowDifficulty(OsuBeatmap osuBeatmap, long startTimeMs, long endTimeMs) {
-        String beatmapStr = osuBeatmap.toWindowedBeatmapString(startTimeMs, endTimeMs) + "\0";
-
-        byte[] pinnedBytes = beatmapStr.getBytes(java.nio.charset.StandardCharsets.UTF_8);
         try {
-//            final Path tempFile = Files.createTempFile("osu-parser-beatmap-temp", ".osu");
-//            tempFile.toFile().deleteOnExit();
-//            Files.writeString(tempFile, osuBeatmap.toWindowedBeatmapString(startTimeMs, endTimeMs));
+            final Path tempFile = Files.createTempFile("osu-parser-beatmap-temp", ".osu");
+            tempFile.toFile().deleteOnExit();
+            Files.writeString(tempFile, osuBeatmap.toWindowedBeatmapString(startTimeMs, endTimeMs));
             try (
-                    desu.life.RosuFFI.Beatmap beatmap = new desu.life.RosuFFI.Beatmap(pinnedBytes);
+                    desu.life.RosuFFI.Beatmap beatmap = new desu.life.RosuFFI.Beatmap(tempFile.toAbsolutePath().toString());
                     desu.life.RosuFFI.Difficulty diff = new desu.life.RosuFFI.Difficulty();
                     desu.life.RosuFFI.Performance performance = new RosuFFI.Performance()
             ) {
                 final double stars = diff.calculate(beatmap).osu.t.stars;
                 final double pp = performance.calculate(beatmap).osu.t.pp;
 
-//                Files.deleteIfExists(tempFile);
+                Files.deleteIfExists(tempFile);
                 return new ImmutablePair<>(stars, pp);
             } catch (RosuFFI.FFIException e) {
                 throw new RuntimeException(e);
