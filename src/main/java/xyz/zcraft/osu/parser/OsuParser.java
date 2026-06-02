@@ -14,6 +14,8 @@ import xyz.zcraft.osu.parser.data.replay.ReplayAnalyze;
 import xyz.zcraft.osu.parser.data.replay.WdPerform;
 import xyz.zcraft.osu.parser.exception.ParseException;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.LinkedList;
@@ -93,6 +95,19 @@ public class OsuParser {
 
             return diffSpec;
         } catch (RosuFFI.FFIException | ParseException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static double estimatePp(Score score, OsuBeatmap beatmap) {
+        try {
+            final Path tempFile = Files.createTempFile("osu-parser-beatmap-temp", ".osu");
+            tempFile.toFile().deleteOnExit();
+            Files.writeString(tempFile, beatmap.toBeatmapString());
+            final double v = estimatePp(score, tempFile);
+            Files.deleteIfExists(tempFile);
+            return v;
+        } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }

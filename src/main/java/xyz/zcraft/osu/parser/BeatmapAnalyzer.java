@@ -58,15 +58,12 @@ public class BeatmapAnalyzer {
     }
 
     public static Pair<Double, Double> calculateWindowDifficulty(OsuBeatmap osuBeatmap, long startTimeMs, long endTimeMs) {
-        String slicedOsuString = osuBeatmap.toWindowedBeatmapString(startTimeMs, endTimeMs);
-
-        byte[] pinnedBytes = slicedOsuString.getBytes(StandardCharsets.UTF_8);
         try {
             final Path tempFile = Files.createTempFile("osu-parser-beatmap-temp", ".osu");
             tempFile.toFile().deleteOnExit();
-            Files.writeString(tempFile, slicedOsuString);
+            Files.writeString(tempFile, osuBeatmap.toWindowedBeatmapString(startTimeMs, endTimeMs));
             try (
-                    desu.life.RosuFFI.Beatmap beatmap = new desu.life.RosuFFI.Beatmap(pinnedBytes);
+                    desu.life.RosuFFI.Beatmap beatmap = new desu.life.RosuFFI.Beatmap(tempFile.toAbsolutePath().toString());
                     desu.life.RosuFFI.Difficulty diff = new desu.life.RosuFFI.Difficulty();
                     desu.life.RosuFFI.Performance performance = new RosuFFI.Performance()
             ) {
