@@ -34,7 +34,7 @@ import xyz.zcraft.osu.parser.data.beatmap.OsuBeatmap;
 import java.nio.file.Path;
 
 public class Example {
-    public static void main(String[] args) throws Exception {
+    static void main(String[] args) throws Exception {
         Path beatmapFile = Path.of("/path/to/beatmap.osu");
         OsuBeatmap map = BeatmapParser.parseBeatmap(beatmapFile);
         System.out.println(map.getTitleUnicode());
@@ -51,7 +51,7 @@ import xyz.zcraft.osu.parser.data.replay.OsuReplay;
 import java.nio.file.Path;
 
 public class Example {
-    public static void main(String[] args) throws Exception {
+    static void main(String[] args) throws Exception {
         Path replayFile = Path.of("/path/to/replay.osr");
         OsuReplay replay = ReplayParser.parseReplay(replayFile);
         System.out.println(replay.count300());
@@ -71,7 +71,7 @@ import xyz.zcraft.osu.parser.data.replay.ReplayAnalyze;
 import java.nio.file.Path;
 
 public class Example {
-    public static void main(String[] args) throws Exception {
+    static void main(String[] args) throws Exception {
         Path beatmapFile = Path.of("/path/to/beatmap.osu");
         OsuBeatmap beatmap = BeatmapParser.parseBeatmap(beatmapFile);
         Path replayFile = Path.of("/path/to/replay.osr");
@@ -91,11 +91,14 @@ import xyz.zcraft.osu.parser.OsuParser;
 import java.nio.file.Path;
 
 public class Example {
-    public static void main(String[] args) {
+    static void main(String[] args) {
         Score score = new Score();
         // ...populate stats and mods...
-
-        double pp = OsuParser.estimatePp(score, Path.of("/path/to/beatmap.osu"));
+      
+        Path beatmapFile = Path.of("/path/to/beatmap.osu");
+        OsuBeatmap beatmap = BeatmapParser.parseBeatmap(beatmapFile);
+      
+        double pp = OsuParser.estimatePp(score, beatmap);
         System.out.println(pp);
     }
 }

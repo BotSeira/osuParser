@@ -10,6 +10,9 @@ import java.util.List;
 @Data
 public class OsuBeatmap {
     private String hash;
+    private double bpm;
+    private double hitLength;
+    private double totalLength;
 
     // [General]
     private String audioFileName;
@@ -264,6 +267,7 @@ public class OsuBeatmap {
             }
         }
 
+        @Getter
         public static class BackgroundEvent extends Event {
             private final long startTime;
             private final String fileName;
@@ -284,6 +288,7 @@ public class OsuBeatmap {
             }
         }
 
+        @Getter
         public static class VideoEvent extends Event {
             private final long startTime;
             private final String fileName;
@@ -304,6 +309,7 @@ public class OsuBeatmap {
             }
         }
 
+        @Getter
         public static class BreakEvent extends Event {
             private final long startTime;
             private final long endTime;
@@ -320,6 +326,7 @@ public class OsuBeatmap {
             }
         }
 
+        @Getter
         public static class StoryboardEvent extends Event {
             private final String rawData;
 

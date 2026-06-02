@@ -480,13 +480,14 @@ public class RosuFFI {
 
 
         @Structure.FieldOrder({"data", "len"})
-        public static class Sliceu8 extends Structure {
+        public static class Sliceu8 extends Structure implements Structure.ByValue {
             public Pointer data;
             public long len;
 
             public Sliceu8(ByteBuffer data) {
                 this.data = Native.getDirectBufferPointer(data);
                 this.len = data.capacity();
+                this.write();
             }
 
             public Sliceu8(byte[] data) {
@@ -494,6 +495,7 @@ public class RosuFFI {
                 mem.write(0, data, 0, data.length);
                 this.data = mem;
                 this.len = data.length;
+                this.write();
             }
 
             public Sliceu8() {}
@@ -910,11 +912,9 @@ public class RosuFFI {
         // Load the Beatmap from bytes
         public Beatmap(byte[] data) throws FFIException {
             _context = new PointerByReference();  // Initialize _context to a valid Pointer
-            ByteBuffer buffer = ByteBuffer.allocateDirect(data.length);
-            buffer.put(data);
-            buffer.flip();
-            var sliceu8 = new RosuPPLib.Sliceu8(buffer);
+            var sliceu8 = new RosuPPLib.Sliceu8(data);
             int rval = RosuPPLib.beatmap_from_bytes(_context, sliceu8);
+            java.lang.ref.Reference.reachabilityFence(sliceu8);
             if (rval != FFIError.Ok) {
                 throw new FFIException("Error loading beatmap from bytes", rval);
             }

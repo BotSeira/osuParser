@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import desu.life.RosuFFI;
+import org.apache.commons.lang3.tuple.Pair;
 import xyz.zcraft.osu.model.BeatmapExtended;
 import xyz.zcraft.osu.model.Mod;
 import xyz.zcraft.osu.model.Score;
@@ -14,8 +15,6 @@ import xyz.zcraft.osu.parser.data.replay.ReplayAnalyze;
 import xyz.zcraft.osu.parser.data.replay.WdPerform;
 import xyz.zcraft.osu.parser.exception.ParseException;
 
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.LinkedList;
@@ -100,94 +99,104 @@ public class OsuParser {
         }
     }
 
-//    public static DiffSpec getDiffSpecForMap(OsuBeatmap beatmap, String mod) {
-//        try (final RosuFFI.Beatmap rosuBeatmap = new RosuFFI.Beatmap(beatmapFile.toAbsolutePath().toString());
-//             final RosuFFI.Performance perf = new RosuFFI.Performance()
-//        ) {
-//            final OsuBeatmap osuBeatmap = BeatmapParser.parseBeatmap(beatmapFile);
-//
-//            final DiffSpec diffSpec = new DiffSpec();
-//
-//            final RosuFFI.Mods mods = RosuFFI.Mods.fromAcronyms(mod == null ? "" : mod, RosuFFI.Mode.Osu);
-//
-//            mods.removeUnknownMods();
-//            mods.sanitize();
-//
-//            perf.setMods(mods);
-//
-//            perf.setAccuracy(98.0);
-//            perf.setMisses(0);
-//
-//            var calc = perf.calculate(rosuBeatmap);
-//            diffSpec.setPpFC(calc.osu.t.pp);
-//
-//            perf.setAccuracy(95.0);
-//
-//            calc = perf.calculate(rosuBeatmap);
-//            diffSpec.setPp95(calc.osu.t.pp);
-//
-//            perf.setAccuracy(100.0);
-//            perf.setMisses(0);
-//
-//            calc = perf.calculate(rosuBeatmap);
-//            diffSpec.setPpSS(calc.osu.t.pp);
-//
-//            final RosuFFI.RosuPPLib.ScoreState scoreState = perf.generateState(rosuBeatmap);
-//
-//            final var attr = calc.osu.t.difficulty;
-//            diffSpec.setAim(attr.aim);
-//            diffSpec.setSpeed(attr.speed);
-//
-//            diffSpec.setBpm(beatmap.getBpm());
-//            diffSpec.setLength(beatmap.getHitLength());
-//            diffSpec.setTotalLength(beatmap.getTotalLength());
-//            diffSpec.setStar(calc.osu.t.difficulty.stars);
-//
-//            if (mod != null && !mod.isEmpty()) {
-//                diffSpec.setModStr(mod);
-//                diffSpec.setModded(true);
-//            }
-//
-//            if (mods.contains("DT") || mods.contains("NC")) {
-//                diffSpec.setBpm(diffSpec.getBpm() * 1.5);
-//                diffSpec.setLength(diffSpec.getLength() / 1.5);
-//                diffSpec.setTotalLength(diffSpec.getTotalLength() / 1.5);
-//            } else if (mods.contains("HT") || mods.contains("DC")) {
-//                diffSpec.setBpm(diffSpec.getBpm() * 0.75);
-//                diffSpec.setLength(diffSpec.getLength() / 0.75);
-//                diffSpec.setTotalLength(diffSpec.getTotalLength() / 0.75);
-//            }
-//
-//            final LinkedList<Mod> modList = new LinkedList<>();
-//
-//            for (JsonElement jsonElement : JsonParser.parseString(mods.toJson().toString()).getAsJsonArray().asList()) {
-//                modList.add(GSON.fromJson(jsonElement, Mod.class));
-//            }
-//
-//            diffSpec.setMods(modList);
-//            diffSpec.setMaxCombo(scoreState.max_combo);
-//
-//            diffSpec.setDifficulty(BeatmapAnalyzer.calculateDifficulty(osuBeatmap, mods.getBits()));
-//
-//            return diffSpec;
-//        } catch (RosuFFI.FFIException | ParseException e) {
-//            throw new RuntimeException(e);
-//        }
-//    }
+    public static DiffSpec getDiffSpecForMap(OsuBeatmap beatmap, String mod) {
+        try (final RosuFFI.Beatmap rosuBeatmap = new RosuFFI.Beatmap(beatmap.toBeatmapString().getBytes());
+             final RosuFFI.Performance perf = new RosuFFI.Performance()
+        ) {
+            final DiffSpec diffSpec = new DiffSpec();
+
+            final RosuFFI.Mods mods = RosuFFI.Mods.fromAcronyms(mod == null ? "" : mod, RosuFFI.Mode.Osu);
+
+            mods.removeUnknownMods();
+            mods.sanitize();
+
+            perf.setMods(mods);
+
+            perf.setAccuracy(98.0);
+            perf.setMisses(0);
+
+            var calc = perf.calculate(rosuBeatmap);
+            diffSpec.setPpFC(calc.osu.t.pp);
+
+            perf.setAccuracy(95.0);
+
+            calc = perf.calculate(rosuBeatmap);
+            diffSpec.setPp95(calc.osu.t.pp);
+
+            perf.setAccuracy(100.0);
+            perf.setMisses(0);
+
+            calc = perf.calculate(rosuBeatmap);
+            diffSpec.setPpSS(calc.osu.t.pp);
+
+            final RosuFFI.RosuPPLib.ScoreState scoreState = perf.generateState(rosuBeatmap);
+
+            final var attr = calc.osu.t.difficulty;
+            diffSpec.setAim(attr.aim);
+            diffSpec.setSpeed(attr.speed);
+
+            diffSpec.setBpm(BeatmapAnalyzer.calculateBpm(beatmap));
+
+            final Pair<Integer, Integer> lengths = BeatmapAnalyzer.calculateLengths(beatmap);
+
+            diffSpec.setTotalLength(lengths.getKey());
+            diffSpec.setLength(lengths.getValue());
+
+            diffSpec.setStar(calc.osu.t.difficulty.stars);
+
+            if (mod != null && !mod.isEmpty()) {
+                diffSpec.setModStr(mod);
+                diffSpec.setModded(true);
+            }
+
+            if (mods.contains("DT") || mods.contains("NC")) {
+                diffSpec.setBpm(diffSpec.getBpm() * 1.5);
+                diffSpec.setLength(diffSpec.getLength() / 1.5);
+                diffSpec.setTotalLength(diffSpec.getTotalLength() / 1.5);
+            } else if (mods.contains("HT") || mods.contains("DC")) {
+                diffSpec.setBpm(diffSpec.getBpm() * 0.75);
+                diffSpec.setLength(diffSpec.getLength() / 0.75);
+                diffSpec.setTotalLength(diffSpec.getTotalLength() / 0.75);
+            }
+
+            final LinkedList<Mod> modList = new LinkedList<>();
+
+            for (JsonElement jsonElement : JsonParser.parseString(mods.toJson().toString()).getAsJsonArray().asList()) {
+                modList.add(GSON.fromJson(jsonElement, Mod.class));
+            }
+
+            diffSpec.setMods(modList);
+            diffSpec.setMaxCombo(scoreState.max_combo);
+
+            diffSpec.setDifficulty(BeatmapAnalyzer.calculateDifficulty(beatmap, mods.getBits()));
+
+            return diffSpec;
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to calculate difficulty spec for beatmap", e);
+        }
+    }
 
     public static double estimatePp(Score score, OsuBeatmap beatmap) {
-        try {
-            final Path tempFile = Files.createTempFile("osu-parser-beatmap-temp", ".osu");
-            tempFile.toFile().deleteOnExit();
-            Files.writeString(tempFile, beatmap.toBeatmapString());
-            final double v = estimatePp(score, tempFile);
-            Files.deleteIfExists(tempFile);
-            return v;
-        } catch (IOException e) {
+        try (final RosuFFI.Beatmap rosuBeatmap = new RosuFFI.Beatmap(beatmap.toBeatmapString().getBytes());
+             final RosuFFI.Performance perf = new RosuFFI.Performance()
+        ) {
+            perf.setMods(RosuFFI.Mods.fromAcronyms(score.getMods().stream().map(Mod::getAcronym).reduce("", String::concat), RosuFFI.Mode.Osu));
+
+            perf.setAccuracy(score.getAccuracy() * 100);
+            perf.setN300(score.getStatistics().getOrDefault("great", 0L));
+            perf.setN100(score.getStatistics().getOrDefault("ok", 0L));
+            perf.setN50(score.getStatistics().getOrDefault("meh", 0L));
+            perf.setMisses(score.getStatistics().getOrDefault("miss", 0L));
+
+            var calc = perf.calculate(rosuBeatmap);
+
+            return calc.osu.t.pp;
+        } catch (RosuFFI.FFIException e) {
             throw new RuntimeException(e);
         }
     }
 
+    @Deprecated
     public static double estimatePp(Score score, Path beatmapFile) {
         try (final RosuFFI.Beatmap rosuBeatmap = new RosuFFI.Beatmap(beatmapFile.toAbsolutePath().toString());
              final RosuFFI.Performance perf = new RosuFFI.Performance()

@@ -10,19 +10,9 @@ import xyz.zcraft.osu.parser.data.beatmap.OsuBeatmap;
 import xyz.zcraft.osu.parser.data.beatmap.WindowDifficulty;
 import xyz.zcraft.osu.parser.exception.AnalyzeException;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class BeatmapAnalyzer {
-    public static WindowDifficulty getDifficultyPeak(OsuBeatmap osuBeatmap) {
-        final var difficulty = getWindowDifficulties(osuBeatmap);
-
-        return difficulty.stream().sorted(Comparator.comparing(WindowDifficulty::starRating)).toList().reversed().getFirst();
-    }
-
     public static List<WindowDifficulty> getWindowDifficulties(OsuBeatmap osuBeatmap) {
         List<Long> timestamps = extractTimestamps(osuBeatmap);
         if (timestamps.isEmpty()) {
@@ -33,7 +23,7 @@ public class BeatmapAnalyzer {
         long windowDurationMs = 20 * 1000L;
         List<WindowDifficulty> difficulties = new ArrayList<>((int) (timestamps.getLast() / windowDurationMs + 1));
 
-        for (int i = 0; i < timestamps.size(); i++) {
+        for (int i = 0; i < timestamps.size(); i += 5) {
             long windowStartTime = timestamps.get(i);
             long windowEndTime = windowStartTime + windowDurationMs;
 
@@ -57,22 +47,17 @@ public class BeatmapAnalyzer {
         return difficulties;
     }
 
-    private static final ConcurrentHashMap<Long, Path> tempBeatmaps = new ConcurrentHashMap<>();
-
     public static Pair<Double, Double> calculateWindowDifficulty(OsuBeatmap osuBeatmap, long startTimeMs, long endTimeMs) {
         try {
-            final Path tempFile = Files.createTempFile("osu-parser-beatmap-temp", ".osu");
-            tempFile.toFile().deleteOnExit();
-            Files.writeString(tempFile, osuBeatmap.toWindowedBeatmapString(startTimeMs, endTimeMs));
+            final String str = osuBeatmap.toWindowedBeatmapString(startTimeMs, endTimeMs);
             try (
-                    desu.life.RosuFFI.Beatmap beatmap = new desu.life.RosuFFI.Beatmap(tempFile.toAbsolutePath().toString());
+                    desu.life.RosuFFI.Beatmap beatmap = new desu.life.RosuFFI.Beatmap(str.getBytes());
                     desu.life.RosuFFI.Difficulty diff = new desu.life.RosuFFI.Difficulty();
                     desu.life.RosuFFI.Performance performance = new RosuFFI.Performance()
             ) {
                 final double stars = diff.calculate(beatmap).osu.t.stars;
                 final double pp = performance.calculate(beatmap).osu.t.pp;
 
-                Files.deleteIfExists(tempFile);
                 return new ImmutablePair<>(stars, pp);
             } catch (RosuFFI.FFIException e) {
                 throw new RuntimeException(e);
@@ -131,18 +116,7 @@ public class BeatmapAnalyzer {
         return new DifficultyAttribute(cs, od, ar, hp, beatmap.getOd(), clockRate);
     }
 
-    public static double calculateBpm(OsuBeatmap beatmap, long mods) {
-        boolean hasDT = (mods & 64) > 0;
-        boolean hasHT = (mods & 256) > 0;
-        boolean hasNC = (mods & 512) > 0;
-
-        double clockRate = 1.0;
-        if (hasDT || hasNC) {
-            clockRate = 1.5;
-        } else if (hasHT) {
-            clockRate = 0.75;
-        }
-
+    public static double calculateBpm(OsuBeatmap beatmap) {
         final List<OsuBeatmap.TimingPoint> timingPoints = beatmap.getTimingPoints()
                 .stream()
                 .filter(tp -> tp.uninherited() == 1)
@@ -177,6 +151,40 @@ public class BeatmapAnalyzer {
                 .stream()
                 .max(Map.Entry.comparingByValue())
                 .map(Map.Entry::getKey)
-                .orElse(0.0) * clockRate;
+                .orElse(0.0);
+    }
+
+    /**
+     * @return Pair of Total Length and Hit Length
+     */
+    public static Pair<Integer, Integer> calculateLengths(OsuBeatmap beatmap) {
+        List<HitObject> hitObjects = beatmap.getHitObjects();
+        if (hitObjects == null || hitObjects.isEmpty()) {
+            return new ImmutablePair<>(0, 0);
+        }
+
+        long firstObjectTime = hitObjects.getFirst().getTime();
+        long baseTotalLengthMs = hitObjects.getLast().getTime();
+
+        long totalBreakTimeMs = 0;
+        var events = beatmap.getBreakEvents();
+
+        for (var line : events) {
+            long breakStart = line.getStartTime();
+            long breakEnd = line.getEndTime();
+
+            if (breakEnd > breakStart) {
+                totalBreakTimeMs += (breakEnd - breakStart);
+            }
+        }
+
+        long baseHitLengthMs = (baseTotalLengthMs - firstObjectTime) - totalBreakTimeMs;
+
+        baseHitLengthMs = Math.max(0, baseHitLengthMs);
+
+        int totalLengthSeconds = (int) Math.round((baseTotalLengthMs / 1000.0));
+        int hitLengthSeconds = (int) Math.round((baseHitLengthMs / 1000.0));
+
+        return new ImmutablePair<>(totalLengthSeconds, hitLengthSeconds);
     }
 }
