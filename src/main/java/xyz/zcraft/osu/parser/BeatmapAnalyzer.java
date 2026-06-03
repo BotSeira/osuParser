@@ -13,7 +13,7 @@ import xyz.zcraft.osu.parser.exception.AnalyzeException;
 import java.util.*;
 
 public class BeatmapAnalyzer {
-    public static List<WindowDifficulty> getWindowDifficulties(OsuBeatmap osuBeatmap) {
+    public static List<WindowDifficulty> getWindowDifficulties(OsuBeatmap osuBeatmap) throws AnalyzeException {
         List<Long> timestamps = extractTimestamps(osuBeatmap);
         if (timestamps.isEmpty()) {
             throw new AnalyzeException("No hit objects found in the beatmap.");
