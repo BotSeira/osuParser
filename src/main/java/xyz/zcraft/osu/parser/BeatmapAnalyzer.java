@@ -19,34 +19,37 @@ public class BeatmapAnalyzer {
             throw new AnalyzeException("No hit objects found in the beatmap.");
         }
 
-        double maxStarRating = 0;
+        double maxPp = 0;
         long windowDurationMs = 20 * 1000L;
         List<WindowDifficulty> difficulties = new ArrayList<>((int) (timestamps.getLast() / windowDurationMs + 1));
 
         for (int i = 0; i < timestamps.size(); i += 5) {
-            long windowStartTime = timestamps.get(i);
-            long windowEndTime = windowStartTime + windowDurationMs;
+            long start = timestamps.get(i);
+            long end = start + windowDurationMs;
 
-            if (windowEndTime > timestamps.getLast()) {
+            if (end > timestamps.getLast()) {
                 break;
             }
 
             try {
-                var windowSR = calculateWindowDifficulty(osuBeatmap, windowStartTime, windowEndTime);
+                var windowDiff = calculateWindowDifficulty(osuBeatmap, start, end);
+                final Double windowStar = windowDiff.getKey();
+                final Double windowPp = windowDiff.getValue();
 
-                if (windowSR.getKey() > maxStarRating) {
-                    maxStarRating = windowSR.getKey();
-                }
+                maxPp = Math.max(maxPp, windowPp);
 
-                difficulties.add(new WindowDifficulty(windowStartTime, windowEndTime, windowSR.getKey(), windowSR.getValue()));
+                difficulties.add(new WindowDifficulty(start, end, windowStar, windowPp));
             } catch (Exception e) {
-                throw new AnalyzeException("Failed to calculate window difficulty around " + windowStartTime, e);
+                throw new AnalyzeException("Failed to calculate window difficulty around " + start, e);
             }
         }
 
         return difficulties;
     }
 
+    /**
+     * @return Pair of window's star rating and PP
+     */
     public static Pair<Double, Double> calculateWindowDifficulty(OsuBeatmap osuBeatmap, long startTimeMs, long endTimeMs) {
         try {
             final String str = osuBeatmap.toWindowedBeatmapString(startTimeMs, endTimeMs);

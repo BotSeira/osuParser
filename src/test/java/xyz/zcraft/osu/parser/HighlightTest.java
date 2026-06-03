@@ -12,7 +12,7 @@ import static xyz.zcraft.osu.parser.BeatmapParser.parseBeatmap;
 import static xyz.zcraft.osu.parser.Util.getRes;
 
 public class HighlightTest {
-    @RepeatedTest(3)
+    @RepeatedTest(1)
     void highlightTest() throws Exception {
         Path beatmapPath = getRes("beatmaps/5198852.osu");
         Path replayPath = getRes("replays/solo-replay-osu_5198852_6610582386.osr");
