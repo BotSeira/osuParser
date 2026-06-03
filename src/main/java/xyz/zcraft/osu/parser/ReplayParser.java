@@ -6,6 +6,7 @@ import xyz.zcraft.osu.parser.exception.ParseException;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -17,12 +18,16 @@ import java.util.LinkedList;
 import java.util.List;
 
 public class ReplayParser {
-    public static OsuReplay parseReplay(Path filePath) throws Exception {
-        byte[] bytes = Files.readAllBytes(filePath);
-        return parseReplay(bytes);
+    public static OsuReplay parseReplay(Path filePath) throws ParseException {
+        try {
+            byte[] bytes = Files.readAllBytes(filePath);
+            return parseReplay(bytes);
+        } catch (IOException e) {
+            throw new ParseException("Failed to read replay file", e);
+        }
     }
 
-    public static OsuReplay parseReplay(byte[] bytes) throws Exception {
+    public static OsuReplay parseReplay(byte[] bytes) throws ParseException {
         ByteBuffer buffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
 
         byte gameMode = buffer.get();
@@ -72,7 +77,7 @@ public class ReplayParser {
         return new String(stringBytes, StandardCharsets.UTF_8);
     }
 
-    private static List<OsuReplay.KeyFrame> parseReplayFrames(ByteBuffer buffer) throws Exception {
+    private static List<OsuReplay.KeyFrame> parseReplayFrames(ByteBuffer buffer) throws ParseException {
         int compressedDataLength = buffer.getInt();
 
         byte[] compressedBytes = new byte[compressedDataLength];
@@ -88,6 +93,8 @@ public class ReplayParser {
             if (replayDataString != null) {
                 return analyzeFrames(replayDataString);
             }
+        } catch (IOException e) {
+            throw new ParseException("Failed to parse replay frames", e);
         }
 
         return null;
