@@ -114,5 +114,5 @@ public class Example {
 
 ## License
 
-Add your preferred license here.
+MIT. See `LICENSE`.
 
