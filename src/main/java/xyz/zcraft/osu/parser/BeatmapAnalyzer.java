@@ -10,17 +10,18 @@ import xyz.zcraft.osu.parser.data.beatmap.OsuBeatmap;
 import xyz.zcraft.osu.parser.data.beatmap.WindowDifficulty;
 import xyz.zcraft.osu.parser.exception.AnalyzeException;
 
+import java.time.Duration;
 import java.util.*;
 
 public class BeatmapAnalyzer {
-    public static List<WindowDifficulty> getWindowDifficulties(OsuBeatmap osuBeatmap) throws AnalyzeException {
+    public static List<WindowDifficulty> getWindowDifficulties(OsuBeatmap osuBeatmap, Duration window) throws AnalyzeException {
         List<Long> timestamps = extractTimestamps(osuBeatmap);
         if (timestamps.isEmpty()) {
             throw new AnalyzeException("No hit objects found in the beatmap.");
         }
 
         double maxPp = 0;
-        long windowDurationMs = 20 * 1000L;
+        long windowDurationMs = window.toMillis();
         List<WindowDifficulty> difficulties = new ArrayList<>((int) (timestamps.getLast() / windowDurationMs + 1));
 
         for (int i = 0; i < timestamps.size(); i += 5) {

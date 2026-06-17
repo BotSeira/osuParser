@@ -14,6 +14,7 @@ import xyz.zcraft.osu.parser.data.replay.ReplayAnalyze;
 import xyz.zcraft.osu.parser.data.replay.WdPerform;
 import xyz.zcraft.osu.parser.exception.AnalyzeException;
 
+import java.time.Duration;
 import java.util.Comparator;
 import java.util.LinkedList;
 
@@ -119,7 +120,7 @@ public class OsuParser {
     }
 
     public static WdPerform getHighlight(ReplayAnalyze ra) throws AnalyzeException {
-        return BeatmapAnalyzer.getWindowDifficulties(ra.beatmap())
+        return BeatmapAnalyzer.getWindowDifficulties(ra.beatmap(), Duration.ofSeconds(20))
                 .stream().map(wd -> calculatePerform(ra, wd))
                 .sorted(Comparator.comparing(WdPerform::wdScore))
                 .toList()
