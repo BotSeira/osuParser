@@ -1,5 +1,6 @@
 package xyz.zcraft.osu.parser;
 
+import org.apache.commons.lang3.tuple.Pair;
 import xyz.zcraft.osu.parser.data.beatmap.HitObject;
 import xyz.zcraft.osu.parser.data.beatmap.OsuBeatmap;
 import xyz.zcraft.osu.parser.exception.ParseException;
@@ -61,6 +62,14 @@ public class BeatmapParser {
                     }
                 }
             }
+
+            beatmap.setBpm(BeatmapAnalyzer.calculateBpm(beatmap));
+
+            final Pair<Integer, Integer> len = BeatmapAnalyzer.calculateLengths(beatmap);
+
+            beatmap.setTotalLength(len.getLeft());
+            beatmap.setHitLength(len.getRight());
+
             return beatmap;
         } catch (Exception e) {
             throw new ParseException("Cannot parse beatmap", e);

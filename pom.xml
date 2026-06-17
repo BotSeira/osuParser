@@ -6,7 +6,7 @@
 
     <groupId>com.github.ZayrexDev</groupId>
     <artifactId>osuParser</artifactId>
-    <version>v1.1.4</version>
+    <version>v1.1.5</version>
 
     <properties>
         <maven.compiler.source>25</maven.compiler.source>
