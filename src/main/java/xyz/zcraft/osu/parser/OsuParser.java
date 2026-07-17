@@ -33,28 +33,28 @@ public class OsuParser {
             mods.removeUnknownMods();
             mods.sanitize();
 
-            perf.setMods(mods);
+            perf.mods(mods);
 
-            perf.setAccuracy(98.0);
-            perf.setMisses(0);
+            perf.accuracy(98.0);
+            perf.misses(0);
 
             var calc = perf.calculate(rosuBeatmap);
-            diffSpec.setPpFC(calc.osu.t.pp);
+            diffSpec.setPpFC(calc.asOsu().pp);
 
-            perf.setAccuracy(95.0);
-
-            calc = perf.calculate(rosuBeatmap);
-            diffSpec.setPp95(calc.osu.t.pp);
-
-            perf.setAccuracy(100.0);
-            perf.setMisses(0);
+            perf.accuracy(95.0);
 
             calc = perf.calculate(rosuBeatmap);
-            diffSpec.setPpSS(calc.osu.t.pp);
+            diffSpec.setPp95(calc.asOsu().pp);
 
-            final RosuFFI.RosuPPLib.ScoreState scoreState = perf.generateState(rosuBeatmap);
+            perf.accuracy(100.0);
+            perf.misses(0);
 
-            final var attr = calc.osu.t.difficulty;
+            calc = perf.calculate(rosuBeatmap);
+            diffSpec.setPpSS(calc.asOsu().pp);
+
+            final var scoreState = perf.generateState(rosuBeatmap);
+
+            final var attr = calc.asOsu().difficulty;
             diffSpec.setAim(attr.aim);
             diffSpec.setSpeed(attr.speed);
 
@@ -65,7 +65,7 @@ public class OsuParser {
             diffSpec.setTotalLength(lengths.getKey());
             diffSpec.setLength(lengths.getValue());
 
-            diffSpec.setStar(calc.osu.t.difficulty.stars);
+            diffSpec.setStar(calc.asOsu().difficulty.stars);
 
             if (mod != null && !mod.isEmpty()) {
                 diffSpec.setModStr(mod);
@@ -84,14 +84,14 @@ public class OsuParser {
 
             final LinkedList<Mod> modList = new LinkedList<>();
 
-            for (JsonElement jsonElement : JsonParser.parseString(mods.toJson().toString()).getAsJsonArray().asList()) {
+            for (JsonElement jsonElement : JsonParser.parseString(mods.json()).getAsJsonArray().asList()) {
                 modList.add(GSON.fromJson(jsonElement, Mod.class));
             }
 
             diffSpec.setMods(modList);
             diffSpec.setMaxCombo(scoreState.max_combo);
 
-            diffSpec.setDifficulty(BeatmapAnalyzer.calculateDifficulty(beatmap, mods.getBits()));
+            diffSpec.setDifficulty(BeatmapAnalyzer.calculateDifficulty(beatmap, mods.bits()));
 
             return diffSpec;
         } catch (Exception e) {
@@ -103,17 +103,17 @@ public class OsuParser {
         try (final RosuFFI.Beatmap rosuBeatmap = new RosuFFI.Beatmap(beatmap.toBeatmapString().getBytes());
              final RosuFFI.Performance perf = new RosuFFI.Performance()
         ) {
-            perf.setMods(RosuFFI.Mods.fromAcronyms(score.getMods().stream().map(Mod::getAcronym).reduce("", String::concat), RosuFFI.Mode.Osu));
+            perf.mods(RosuFFI.Mods.fromAcronyms(score.getMods().stream().map(Mod::getAcronym).reduce("", String::concat), RosuFFI.Mode.Osu));
 
-            perf.setAccuracy(score.getAccuracy() * 100);
-            perf.setN300(score.getStatistics().getOrDefault("great", 0L));
-            perf.setN100(score.getStatistics().getOrDefault("ok", 0L));
-            perf.setN50(score.getStatistics().getOrDefault("meh", 0L));
-            perf.setMisses(score.getStatistics().getOrDefault("miss", 0L));
+            perf.accuracy(score.getAccuracy() * 100);
+            perf.n300(score.getStatistics().getOrDefault("great", 0L));
+            perf.n100(score.getStatistics().getOrDefault("ok", 0L));
+            perf.n50(score.getStatistics().getOrDefault("meh", 0L));
+            perf.misses(score.getStatistics().getOrDefault("miss", 0L));
 
             var calc = perf.calculate(rosuBeatmap);
 
-            return calc.osu.t.pp;
+            return calc.asOsu().pp;
         } catch (RosuFFI.FFIException e) {
             throw new AnalyzeException("Failed to calculate PP", e);
         }

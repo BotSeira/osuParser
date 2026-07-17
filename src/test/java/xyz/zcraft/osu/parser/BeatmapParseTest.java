@@ -2,6 +2,7 @@ package xyz.zcraft.osu.parser;
 
 import module java.base;
 import org.junit.jupiter.api.Test;
+import xyz.zcraft.osu.parser.data.beatmap.DiffSpec;
 import xyz.zcraft.osu.parser.data.beatmap.OsuBeatmap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -36,5 +37,19 @@ public class BeatmapParseTest {
 
         assertEquals(78, totalLength, 1);
         assertEquals(76, hitLength, 1);
+    }
+
+    @Test
+    void diffTest() throws Exception {
+        Path beatmapPath = getRes("beatmaps/1961963.osu");
+
+        final OsuBeatmap osuBeatmap = BeatmapParser.parseBeatmap(beatmapPath);
+
+        final Long beatmapId = osuBeatmap.getBeatmapId();
+        assertEquals(1961963, beatmapId);
+
+        final var diff = OsuParser.getDiffSpecForMap(osuBeatmap, "");
+
+        assertEquals(5.38, diff.getStar(), 0.01);
     }
 }

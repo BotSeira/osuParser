@@ -28,8 +28,8 @@ public class HighlightTest {
 
         assertEquals(50540, highlight.startTime());
         assertEquals(70540, highlight.endTime());
-        assertEquals(171.193, highlight.beatmapPp(), 0.01);
+        assertEquals(151.28, highlight.beatmapPp(), 0.01);
         assertEquals(0.946, highlight.accuracy(), 0.01);
-        assertEquals(145.039, highlight.wdScore(), 0.01);
+        assertEquals(128.17, highlight.wdScore(), 0.01);
     }
 }

@@ -59,8 +59,8 @@ public class BeatmapAnalyzer {
                     desu.life.RosuFFI.Difficulty diff = new desu.life.RosuFFI.Difficulty();
                     desu.life.RosuFFI.Performance performance = new RosuFFI.Performance()
             ) {
-                final double stars = diff.calculate(beatmap).osu.t.stars;
-                final double pp = performance.calculate(beatmap).osu.t.pp;
+                final double stars = diff.calculate(beatmap).asOsu().stars;
+                final double pp = performance.calculate(beatmap).asOsu().pp;
 
                 return new ImmutablePair<>(stars, pp);
             } catch (RosuFFI.FFIException e) {
