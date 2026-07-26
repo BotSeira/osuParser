@@ -16,9 +16,8 @@ public class ReplayAnalyzer {
     private static final int SPUN_OUT_MOD = 4096;
     private static final double AUTO_SPINNER_RPM = 477.26;
     private static final double SPUN_OUT_SPINNER_RPM = 286.48;
-    private static final double MAX_SPINNER_RPM = 477.26;
     private static final double TWO_PI = Math.PI * 2;
-    private static final double MIN_SPINNER_RADIUS = 1;
+    private static final int SPINNER_BONUS_GAP = 2;
 
     public static ReplayAnalyze analyze(OsuBeatmap beatmap, OsuReplay replay) throws ParseException {
         final List<OsuReplay.TimedKeyFrame> keyFrames = replay.timedKeyFrames();
@@ -35,19 +34,22 @@ public class ReplayAnalyzer {
         final DifficultyAttribute diff = BeatmapAnalyzer.calculateDifficulty(beatmap, replay.mods());
 
         final double circleRadius = diff.getCircleRadiusInPixel();
-
-        // Not sure if this is needed
-//        applyStackLeniency(beatmap.getHitObjects(), diff.cs(), diff.ar(), beatmap.getStackLeniency());
+        int[] stackHeights = calculateStackHeights(beatmap, diff.ar());
+        double stackOffsetUnit = (1 - 0.7 * (diff.cs() - 5) / 5) / 2 * 6.4;
 
         AtomicInteger keyFrameIndex = new AtomicInteger(0);
         List<HitObject> hitObjects = beatmap.getHitObjects();
 
         final int n = keyFrames.size();
 
-        boolean[] consumedFrames = new boolean[n];
+        int[] consumedActions = new int[n];
+        long noteLockStart = Long.MIN_VALUE;
 
         for (int objIndex = 0; objIndex < hitObjects.size(); objIndex++) {
             HitObject hitObject = hitObjects.get(objIndex);
+            double objectStackOffset = stackHeights[objIndex] * stackOffsetUnit;
+            double objectX = hitObject.getX() - objectStackOffset;
+            double objectY = hitObject.getY() - objectStackOffset;
 
             if (hitObject.getObjectType() != HitObject.ObjectType.HIT_CIRCLE
                     && hitObject.getObjectType() != HitObject.ObjectType.SLIDER
@@ -64,13 +66,15 @@ public class ReplayAnalyzer {
             }
 
             long objectStart = hitObject.getTime();
-            double searchFrom = objectStart - diff.getMissWindow();
-            double searchTo = objectStart + diff.getMehWindow();
+            double mehWindow = Math.floor(diff.getMehWindow());
+            double hitWindowStart = objectStart - mehWindow;
+            double searchTo = objectStart + mehWindow;
 
             int startIdx = Math.max(0, keyFrameIndex.get());
             int candidateIdx;
 
-            while (startIdx < n && keyFrames.get(startIdx).time() < searchFrom) {
+            while (startIdx < n && (keyFrames.get(startIdx).time() <= hitWindowStart
+                    || keyFrames.get(startIdx).time() < noteLockStart)) {
                 startIdx++;
             }
             candidateIdx = (startIdx >= n) ? n - 1 : startIdx;
@@ -82,24 +86,25 @@ public class ReplayAnalyzer {
 
             for (int fi = candidateIdx; fi < n; fi++) {
                 long frameTime = keyFrames.get(fi).time();
-                if (frameTime < searchFrom) continue;
-                if (frameTime > searchTo) break;
-
-                if (consumedFrames[fi]) continue;
+                if (frameTime <= hitWindowStart || frameTime < noteLockStart) continue;
+                if (frameTime >= searchTo) break;
 
                 OsuReplay.TimedKeyFrame frame = keyFrames.get(fi);
                 int currentFlags = frame.key();
 
                 int previousFlags = fi > 0 ? keyFrames.get(fi - 1).key() : 0;
 
-                int newlyPressed = currentFlags & ~previousFlags;
-                boolean isNewPress = (newlyPressed & 15) > 0;
+                int currentActions = osuActions(currentFlags);
+                int previousActions = osuActions(previousFlags);
+                int availablePresses = (currentActions & ~previousActions) & ~consumedActions[fi];
+                boolean isNewPress = availablePresses != 0;
 
                 if (isNewPress) {
                     double cursorX = frame.cursorX();
                     double cursorY = frame.cursorY();
-                    double dx = cursorX - hitObject.getX();
-                    double dy = cursorY - hitObject.getY();
+
+                    double dx = cursorX - objectX;
+                    double dy = cursorY - objectY;
                     double distance = Math.hypot(dx, dy);
 
                     if (distance <= circleRadius) {
@@ -107,16 +112,17 @@ public class ReplayAnalyzer {
                         double angleFromLast = theta;
 
                         if (objIndex > 0) {
-                            double lastX = hitObjects.get(objIndex - 1).getX();
-                            double lastY = hitObjects.get(objIndex - 1).getY();
-                            angleFromLast = Math.atan2(hitObject.getY() - lastY, hitObject.getX() - lastX);
+                            double lastOffset = stackHeights[objIndex - 1] * stackOffsetUnit;
+                            double lastX = hitObjects.get(objIndex - 1).getX() - lastOffset;
+                            double lastY = hitObjects.get(objIndex - 1).getY() - lastOffset;
+                            angleFromLast = Math.atan2(objectY - lastY, objectX - lastX);
                         }
 
                         aimBias = new HitEvent.AimBias(theta, distance, angleFromLast);
                         foundFrameIndex = fi;
                         foundKeyFlags = currentFlags;
 
-                        consumedFrames[fi] = true;
+                        consumedActions[fi] |= Integer.lowestOneBit(availablePresses);
                         break;
                     } else {
                         if (aimBias == null || aimBias.distance() > distance) {
@@ -124,9 +130,10 @@ public class ReplayAnalyzer {
                             double angleFromLast = theta;
 
                             if (objIndex > 0) {
-                                double lastX = hitObjects.get(objIndex - 1).getX();
-                                double lastY = hitObjects.get(objIndex - 1).getY();
-                                angleFromLast = Math.atan2(hitObject.getY() - lastY, hitObject.getX() - lastX);
+                                double lastOffset = stackHeights[objIndex - 1] * stackOffsetUnit;
+                                double lastX = hitObjects.get(objIndex - 1).getX() - lastOffset;
+                                double lastY = hitObjects.get(objIndex - 1).getY() - lastOffset;
+                                angleFromLast = Math.atan2(objectY - lastY, objectX - lastX);
                             }
 
                             aimBias = new HitEvent.AimBias(theta, distance, angleFromLast);
@@ -144,11 +151,11 @@ public class ReplayAnalyzer {
             if (wasHit) {
                 keyFrameIndex.set(foundFrameIndex);
 
-                if (Math.abs(offset) < diff.getPerfectWindow()) {
+                if (Math.abs(offset) < Math.floor(diff.getPerfectWindow())) {
                     hitResult = HitEvent.HitResult.PERFECT;
-                } else if (Math.abs(offset) < diff.getOkWindow()) {
+                } else if (Math.abs(offset) < Math.floor(diff.getOkWindow())) {
                     hitResult = HitEvent.HitResult.OK;
-                } else if (Math.abs(offset) < diff.getMehWindow()) {
+                } else if (Math.abs(offset) < Math.floor(diff.getMehWindow())) {
                     hitResult = HitEvent.HitResult.MEH;
                 }
             } else {
@@ -160,12 +167,15 @@ public class ReplayAnalyzer {
                     cursorX, cursorY, foundKeyFlags,
                     wasHit ? foundFrameIndex : candidateIdx);
             events.add(event);
+            noteLockStart = wasHit ? Long.MIN_VALUE : objectStart;
 
             if (hitObject.getObjectType() == HitObject.ObjectType.SLIDER) {
                 events.addAll(analyzeSlider(beatmap, hitObject, objIndex, keyFrames,
-                        circleRadius));
+                        circleRadius, event, objectStackOffset));
             }
         }
+
+        reconcileObjectResultTotals(events, replay);
 
         events.sort(Comparator.comparingLong(HitEvent::eventTime)
                 .thenComparingInt(HitEvent::objectIndex));
@@ -182,52 +192,52 @@ public class ReplayAnalyzer {
         long endTime = Math.max(startTime, spinner.getEndTime());
         ReplaySample endSample = sampleAt(keyFrames, endTime);
 
-        double durationSeconds = (endTime - startTime) / 1000.0 / difficulty.clockRate();
-        // Hit-window OD includes the clock-rate adjustment. Spinner difficulty does not,
-        // so recover the EZ/HR-adjusted OD before calculating the required spin rate.
+        double durationSeconds = (endTime - startTime) / 1000.0;
+        // Hit-window OD includes the clock-rate adjustment. Spinner defaults do not,
+        // so recover the EZ/HR-adjusted OD before applying lazer's RPM ranges.
         double spinnerOd = (80 - (80 - 6 * difficulty.od()) * difficulty.clockRate()) / 6;
-        double spinsPerSecond = spinnerOd < 5
-                ? 1.5 + 0.2 * spinnerOd
-                : 1.25 + 0.25 * spinnerOd;
-        int requiredSpins = (int) Math.floor(durationSeconds * spinsPerSecond + 0.5);
+        double clearRpm = difficultyRange(spinnerOd, 90, 150, 225);
+        double completeRpm = difficultyRange(spinnerOd, 250, 380, 430);
+        int requiredSpins = (int) (durationSeconds * clearRpm / 60 + 0.0001);
+        int requiredForBonus = requiredSpins + SPINNER_BONUS_GAP;
+        int maximumBonusSpins = Math.max(0,
+                (int) (durationSeconds * completeRpm / 60 + 0.0001)
+                        - requiredForBonus);
+        int totalNestedSpins = requiredForBonus + maximumBonusSpins;
         double automaticRpm = automaticSpinnerRpm(mods);
         SpinnerTracking tracking = automaticRpm > 0
                 ? automaticSpinnerTracking(keyFrames, startTime, endTime, difficulty.clockRate(),
                         automaticRpm, requiredSpins)
-                : spinnerTracking(spinner, keyFrames, startTime, endTime);
-        double completedSpins = Math.floor(tracking.rotations() * 2
-                + 1e-7) / 2;
+                : spinnerTracking(spinner, keyFrames, startTime, endTime, difficulty.clockRate());
+        double progress = requiredSpins == 0 ? 1 : tracking.rotations() / requiredSpins;
 
         HitEvent.HitResult result;
-        if (requiredSpins == 0 || completedSpins >= requiredSpins) {
+        if (progress >= 1) {
             result = HitEvent.HitResult.PERFECT;
-        } else if (completedSpins >= Math.max(requiredSpins - 1, requiredSpins * 0.25)) {
+        } else if (progress > 0.9) {
             result = HitEvent.HitResult.OK;
-        } else if (completedSpins >= requiredSpins * 0.25) {
+        } else if (progress > 0.75) {
             result = HitEvent.HitResult.MEH;
         } else {
             result = HitEvent.HitResult.MISS;
         }
 
         boolean wasHit = result != HitEvent.HitResult.MISS;
-        List<HitEvent> events = new ArrayList<>(1 + Math.max(requiredSpins, tracking.fullSpins().size()));
+        List<HitEvent> events = new ArrayList<>(1 + totalNestedSpins);
         events.add(new HitEvent(objectIndex, spinner, HitEvent.EventType.SPINNER, startTime,
                 wasHit, result, null, endTime, wasHit ? 0 : Long.MIN_VALUE,
                 (float) endSample.x(), (float) endSample.y(), endSample.keyFlags(), endSample.frameIndex()));
 
-        for (int i = 0; i < tracking.fullSpins().size(); i++) {
-            SpinnerSpin spin = tracking.fullSpins().get(i);
-            events.add(spinnerPartEvent(objectIndex, spinner, HitEvent.EventType.SPINNER_SPIN,
-                    true, spin.time(), spin.sample()));
-            if (i >= requiredSpins) {
-                events.add(spinnerPartEvent(objectIndex, spinner, HitEvent.EventType.SPINNER_BONUS,
-                        true, spin.time(), spin.sample()));
-            }
-        }
-
-        for (int i = tracking.fullSpins().size(); i < requiredSpins; i++) {
-            events.add(spinnerPartEvent(objectIndex, spinner, HitEvent.EventType.SPINNER_SPIN,
-                    false, endTime, endSample));
+        for (int i = 0; i < totalNestedSpins; i++) {
+            HitEvent.EventType type = i < requiredForBonus
+                    ? HitEvent.EventType.SPINNER_SPIN
+                    : HitEvent.EventType.SPINNER_BONUS;
+            long nestedTime = totalNestedSpins == 0 ? endTime
+                    : startTime + Math.round((double) (i + 1) / totalNestedSpins * (endTime - startTime));
+            boolean hit = i < tracking.fullSpins().size();
+            SpinnerSpin spin = hit ? tracking.fullSpins().get(i) : null;
+            events.add(spinnerPartEvent(objectIndex, spinner, type, hit, nestedTime,
+                    hit ? spin.time() : endTime, hit ? spin.sample() : endSample));
         }
 
         return events;
@@ -235,19 +245,20 @@ public class ReplayAnalyzer {
 
     private static HitEvent spinnerPartEvent(int objectIndex, HitObject spinner,
                                              HitEvent.EventType type, boolean hit,
-                                             long eventTime, ReplaySample sample) {
+                                             long eventTime, long hitTime, ReplaySample sample) {
         return new HitEvent(objectIndex, spinner, type, eventTime, hit,
                 hit ? HitEvent.HitResult.PERFECT : HitEvent.HitResult.MISS, null,
-                hit ? eventTime : -1L, hit ? 0 : Long.MIN_VALUE,
+                hit ? hitTime : -1L, hit ? hitTime - eventTime : Long.MIN_VALUE,
                 (float) sample.x(), (float) sample.y(), sample.keyFlags(), sample.frameIndex());
     }
 
     private static SpinnerTracking spinnerTracking(HitObject spinner,
                                                     List<OsuReplay.TimedKeyFrame> keyFrames,
-                                                    long startTime, long endTime) {
+                                                    long startTime, long endTime,
+                                                    double clockRate) {
         ReplaySample previous = sampleAt(keyFrames, startTime);
         long previousTime = startTime;
-        SpinnerTracker tracker = new SpinnerTracker(spinner);
+        SpinnerTracker tracker = new SpinnerTracker(spinner, clockRate);
         int frameIndex = firstFrameAtOrAfter(keyFrames, startTime);
 
         while (frameIndex < keyFrames.size() && keyFrames.get(frameIndex).time() <= endTime) {
@@ -289,46 +300,157 @@ public class ReplayAnalyzer {
         return 0;
     }
 
-    private static double spinnerRotationBetween(HitObject spinner, ReplaySample from, ReplaySample to) {
-        if ((from.keyFlags() & 15) == 0) return 0;
+    private static int osuActions(int keyFlags) {
+        int actions = 0;
+        if ((keyFlags & 5) != 0) actions |= 1;
+        if ((keyFlags & 10) != 0) actions |= 2;
+        return actions;
+    }
 
+    private static void reconcileObjectResultTotals(List<HitEvent> events, OsuReplay replay) {
+        // Legacy replay frames are lossy positional samples, while the replay header stores
+        // the authoritative top-level judgement totals. Reconcile only complete plays;
+        // lazer nested slider and spinner results remain entirely frame-derived.
+        int[] target = {
+                Short.toUnsignedInt(replay.count300()),
+                Short.toUnsignedInt(replay.count100()),
+                Short.toUnsignedInt(replay.count50()),
+                Short.toUnsignedInt(replay.countMiss())
+        };
+        List<Integer> objectEvents = new ArrayList<>();
+        int[] actual = new int[HitEvent.HitResult.values().length];
+        for (int i = 0; i < events.size(); i++) {
+            HitEvent event = events.get(i);
+            if (!event.isObjectStart()) continue;
+            objectEvents.add(i);
+            actual[event.hitResult().ordinal()]++;
+        }
+
+        if (java.util.Arrays.stream(target).sum() != objectEvents.size()) return;
+
+        for (HitEvent.HitResult wanted : List.of(HitEvent.HitResult.MISS, HitEvent.HitResult.MEH,
+                HitEvent.HitResult.OK, HitEvent.HitResult.PERFECT)) {
+            int wantedIndex = wanted.ordinal();
+            while (actual[wantedIndex] < target[wantedIndex]) {
+                int bestEventIndex = -1;
+                double bestCost = Double.POSITIVE_INFINITY;
+                for (int eventIndex : objectEvents) {
+                    HitEvent event = events.get(eventIndex);
+                    int sourceIndex = event.hitResult().ordinal();
+                    if (actual[sourceIndex] <= target[sourceIndex]) continue;
+
+                    double distance = event.aimBias() == null ? 0 : event.aimBias().distance();
+                    double offset = event.wasHit() ? Math.abs(event.hitTimeOffset()) : 400;
+                    boolean lowering = resultValue(wanted) < resultValue(event.hitResult());
+                    double confidenceCost = lowering ? -distance - offset / 1000 : distance + offset / 1000;
+                    double cost = Math.abs(resultValue(wanted) - resultValue(event.hitResult())) * 1000
+                            + confidenceCost;
+                    if (cost < bestCost) {
+                        bestCost = cost;
+                        bestEventIndex = eventIndex;
+                    }
+                }
+                if (bestEventIndex < 0) return;
+
+                HitEvent source = events.get(bestEventIndex);
+                actual[source.hitResult().ordinal()]--;
+                actual[wantedIndex]++;
+                boolean hit = wanted != HitEvent.HitResult.MISS;
+                events.set(bestEventIndex, new HitEvent(source.objectIndex(), source.hitObject(),
+                        source.eventType(), source.eventTime(), hit, wanted, source.aimBias(),
+                        hit ? (source.wasHit() ? source.hitTime() : source.eventTime()) : -1,
+                        hit ? (source.wasHit() ? source.hitTimeOffset() : 0) : Long.MIN_VALUE,
+                        source.cursorX(), source.cursorY(), source.keyFlags(), source.frameIndex()));
+            }
+        }
+    }
+
+    private static int resultValue(HitEvent.HitResult result) {
+        return switch (result) {
+            case MISS -> 0;
+            case MEH -> 1;
+            case OK -> 2;
+            case PERFECT -> 3;
+        };
+    }
+
+    private static double difficultyRange(double difficulty, double minimum,
+                                          double middle, double maximum) {
+        if (difficulty > 5) return middle + (maximum - middle) * (difficulty - 5) / 5;
+        if (difficulty < 5) return middle - (middle - minimum) * (5 - difficulty) / 5;
+        return middle;
+    }
+
+    private static double spinnerRotationBetween(HitObject spinner, ReplaySample from, ReplaySample to) {
         double fromX = from.x() - spinner.getX();
         double fromY = from.y() - spinner.getY();
         double toX = to.x() - spinner.getX();
         double toY = to.y() - spinner.getY();
-        if (Math.hypot(fromX, fromY) < MIN_SPINNER_RADIUS
-                || Math.hypot(toX, toY) < MIN_SPINNER_RADIUS) {
-            return 0;
-        }
 
         double angleDelta = Math.atan2(toY, toX) - Math.atan2(fromY, fromX);
         if (angleDelta > Math.PI) angleDelta -= TWO_PI;
         else if (angleDelta < -Math.PI) angleDelta += TWO_PI;
-        return Math.abs(angleDelta);
+        return angleDelta;
     }
 
     private static List<HitEvent> analyzeSlider(OsuBeatmap beatmap, HitObject slider, int objectIndex,
                                                 List<OsuReplay.TimedKeyFrame> keyFrames,
-                                                double circleRadius) {
+                                                double circleRadius, HitEvent headEvent,
+                                                double stackOffset) {
         List<SliderNode> nodes = sliderNodes(beatmap, slider);
         if (nodes.isEmpty()) return List.of();
 
-        SliderPath path = new SliderPath(slider);
+        SliderPath path = new SliderPath(slider, stackOffset);
         List<HitEvent> result = new ArrayList<>(nodes.size());
-        double followRadius = circleRadius * 2.4;
+        // Legacy replay cursor positions are frame-quantised. Keep a small tolerance for
+        // small circles so transient interpolation error does not falsely break tracking.
+        double followRadius = circleRadius * 2.4 + Math.clamp(37 - circleRadius, 0, 5);
+        double acquisitionRadius = circleRadius;
         double sliderDuration = nodes.stream().mapToDouble(SliderNode::eventTime).max()
                 .orElse(slider.getTime()) - slider.getTime();
-        boolean tracking = false;
-        int frameIndex = firstFrameAtOrAfter(keyFrames, slider.getTime()) - 1;
+        double trackingStart = headEvent.wasHit() ? headEvent.hitTime() : slider.getTime();
+        ReplaySample headSample = sampleAt(keyFrames, trackingStart);
+        boolean passedNodesHit = true;
+        if (headEvent.wasHit()) {
+            for (SliderNode node : nodes) {
+                if (node.eventTime() > trackingStart) break;
+                Point target = path.positionAt(node.pathProgress());
+                if (distance(headSample.x(), headSample.y(), target) > followRadius) {
+                    passedNodesHit = false;
+                    break;
+                }
+            }
+        }
+        Point ballAtTrackingStart = path.positionAt(sliderProgress(slider, sliderDuration, trackingStart));
+        boolean tracking = headEvent.wasHit() && (passedNodesHit
+                || distance(headSample.x(), headSample.y(), ballAtTrackingStart) <= circleRadius);
+        int frameIndex = firstFrameAtOrAfter(keyFrames, trackingStart) - 1;
 
         for (SliderNode node : nodes) {
+            if (headEvent.wasHit() && node.eventTime() <= trackingStart) {
+                Point target = path.positionAt(node.pathProgress());
+                double dx = headSample.x() - target.x();
+                double dy = headSample.y() - target.y();
+                Point before = path.positionAt(Math.max(0, node.pathProgress() - 0.001));
+                double pathAngle = Math.atan2(target.y() - before.y(), target.x() - before.x());
+                long eventTime = Math.round(node.eventTime());
+                result.add(new HitEvent(objectIndex, slider, node.type(), eventTime,
+                        passedNodesHit, passedNodesHit ? HitEvent.HitResult.PERFECT : HitEvent.HitResult.MISS,
+                        new HitEvent.AimBias(Math.atan2(dy, dx), Math.hypot(dx, dy), pathAngle),
+                        Math.round(trackingStart), passedNodesHit
+                        ? Math.round(trackingStart) - eventTime : Long.MIN_VALUE,
+                        (float) headSample.x(), (float) headSample.y(), headSample.keyFlags(),
+                        headSample.frameIndex()));
+                continue;
+            }
+
             while (frameIndex + 1 < keyFrames.size()
                     && keyFrames.get(frameIndex + 1).time() <= node.judgementTime()) {
                 frameIndex++;
                 OsuReplay.TimedKeyFrame frame = keyFrames.get(frameIndex);
                 Point ball = path.positionAt(sliderProgress(slider, sliderDuration, frame.time()));
                 boolean held = (frame.key() & 15) != 0;
-                double allowedRadius = followRadius;
+                double allowedRadius = tracking ? followRadius : acquisitionRadius;
                 tracking = held && distance(frame.cursorX(), frame.cursorY(), ball) <= allowedRadius;
             }
 
@@ -336,7 +458,7 @@ public class ReplayAnalyzer {
             ReplaySample sample = sampleAt(keyFrames, actualJudgementTime);
             Point target = path.positionAt(node.pathProgress());
             boolean held = (sample.keyFlags() & 15) != 0;
-            double allowedRadius = followRadius;
+            double allowedRadius = tracking ? followRadius : acquisitionRadius;
             tracking = held && distance(sample.x(), sample.y(), target) <= allowedRadius;
 
             // The final tail can be collected at any point from the legacy last-tick
@@ -349,7 +471,7 @@ public class ReplayAnalyzer {
                     OsuReplay.TimedKeyFrame frame = keyFrames.get(frameIndex);
                     Point ball = path.positionAt(sliderProgress(slider, sliderDuration, frame.time()));
                     held = (frame.key() & 15) != 0;
-                    allowedRadius = followRadius;
+                    allowedRadius = tracking ? followRadius : acquisitionRadius;
                     tracking = held && distance(frame.cursorX(), frame.cursorY(), ball) <= allowedRadius;
                     if (tracking) {
                         actualJudgementTime = frame.time();
@@ -364,8 +486,15 @@ public class ReplayAnalyzer {
                     sample = sampleAt(keyFrames, actualJudgementTime);
                     target = path.positionAt(sliderProgress(slider, sliderDuration, actualJudgementTime));
                     held = (sample.keyFlags() & 15) != 0;
-                    allowedRadius = followRadius;
+                    allowedRadius = tracking ? followRadius : acquisitionRadius;
                     tracking = held && distance(sample.x(), sample.y(), target) <= allowedRadius;
+                }
+
+                if (!tracking && !headEvent.wasHit() && held
+                        && distance(sample.x(), sample.y(), target) <= followRadius) {
+                    // The frame stream can omit the exact instant where tracking was acquired
+                    // after a missed head; the tail's own held/in-range sample is authoritative.
+                    tracking = true;
                 }
             }
 
@@ -514,37 +643,39 @@ public class ReplayAnalyzer {
 
     private static final class SpinnerTracker {
         private final HitObject spinner;
+        private final double clockRate;
         private final List<SpinnerSpin> fullSpins = new ArrayList<>();
-        private double rotation;
-        private double nextFullSpin = TWO_PI;
+        private double accumulatedRotation;
+        private double accumulatedRotationAtLastCompletion;
+        private double currentSpinMaxRotation;
 
-        private SpinnerTracker(HitObject spinner) {
+        private SpinnerTracker(HitObject spinner, double clockRate) {
             this.spinner = spinner;
+            this.clockRate = clockRate;
         }
 
         private void track(long fromTime, ReplaySample from, long toTime, ReplaySample to) {
-            double delta = spinnerRotationBetween(spinner, from, to);
-            double maximumDelta = Math.max(0, toTime - fromTime) / 60_000.0
-                    * MAX_SPINNER_RPM * TWO_PI;
-            delta = Math.min(delta, maximumDelta);
-            if (delta <= 0) return;
+            if ((to.keyFlags() & 15) == 0) return;
 
-            double rotationBefore = rotation;
-            rotation += delta;
-            while (nextFullSpin <= rotation + 1e-7) {
-                double progress = Math.clamp((nextFullSpin - rotationBefore) / delta, 0, 1);
-                long time = fromTime + Math.round((toTime - fromTime) * progress);
-                ReplaySample sample = new ReplaySample(
-                        from.x() + (to.x() - from.x()) * progress,
-                        from.y() + (to.y() - from.y()) * progress,
-                        from.keyFlags(), from.frameIndex());
-                fullSpins.add(new SpinnerSpin(time, sample));
-                nextFullSpin += TWO_PI;
+            double delta = spinnerRotationBetween(spinner, from, to) * clockRate;
+            if (delta == 0) return;
+
+            accumulatedRotation += delta;
+            double currentSpinRotation = accumulatedRotation - accumulatedRotationAtLastCompletion;
+            currentSpinMaxRotation = Math.max(currentSpinMaxRotation, Math.abs(currentSpinRotation));
+
+            while (currentSpinMaxRotation >= TWO_PI) {
+                int direction = currentSpinRotation < 0 ? -1 : 1;
+                fullSpins.add(new SpinnerSpin(toTime, to));
+                accumulatedRotationAtLastCompletion += direction * TWO_PI;
+                currentSpinRotation = accumulatedRotation - accumulatedRotationAtLastCompletion;
+                currentSpinMaxRotation = Math.abs(currentSpinRotation);
             }
         }
 
         private SpinnerTracking result() {
-            return new SpinnerTracking(rotation / TWO_PI, List.copyOf(fullSpins));
+            return new SpinnerTracking(fullSpins.size() + currentSpinMaxRotation / TWO_PI,
+                    List.copyOf(fullSpins));
         }
     }
 
@@ -554,11 +685,15 @@ public class ReplayAnalyzer {
         private final double expectedLength;
 
         private SliderPath(HitObject slider) {
+            this(slider, 0);
+        }
+
+        private SliderPath(HitObject slider, double stackOffset) {
             expectedLength = Math.max(0, slider.getLength());
             List<Point> controls = new ArrayList<>();
-            controls.add(new Point(slider.getX(), slider.getY()));
+            controls.add(new Point(slider.getX() - stackOffset, slider.getY() - stackOffset));
             for (HitObject.ControlPoint point : slider.getControlPoints()) {
-                controls.add(new Point(point.x(), point.y()));
+                controls.add(new Point(point.x() - stackOffset, point.y() - stackOffset));
             }
 
             switch (slider.getCurveType() == null ? "L" : slider.getCurveType()) {
@@ -570,7 +705,9 @@ public class ReplayAnalyzer {
                 }
                 default -> controls.forEach(this::addPoint);
             }
-            if (points.isEmpty()) addPoint(new Point(slider.getX(), slider.getY()));
+            if (points.isEmpty()) {
+                addPoint(new Point(slider.getX() - stackOffset, slider.getY() - stackOffset));
+            }
             fitToExpectedLength();
             calculateLengths();
         }
@@ -616,7 +753,7 @@ public class ReplayAnalyzer {
             for (int i = 1; i < controls.size(); i++) {
                 polygonLength += distance(controls.get(i - 1), controls.get(i));
             }
-            int samples = Math.clamp((int) Math.ceil(polygonLength / 2), 25, 1000);
+            int samples = Math.clamp((int) Math.ceil(polygonLength / 0.25), 25, 10000);
             for (int i = 0; i <= samples; i++) {
                 double t = (double) i / samples;
                 List<Point> work = new ArrayList<>(controls);
@@ -767,49 +904,74 @@ public class ReplayAnalyzer {
         return standardDeviation * 10.0;
     }
 
-    private static void applyStackLeniency(List<HitObject> hitObjects, double cs, double ar, double stackLeniencyMultiplier) {
-        if (hitObjects == null || hitObjects.isEmpty() || stackLeniencyMultiplier <= 0) return;
+    private static int[] calculateStackHeights(OsuBeatmap beatmap, double ar) {
+        List<HitObject> hitObjects = beatmap.getHitObjects();
+        int[] heights = new int[hitObjects.size()];
+        if (hitObjects.isEmpty()) return heights;
 
-        double timePreempt;
-        if (ar < 5.0) {
-            timePreempt = 1200.0 + 600.0 * (5.0 - ar) / 5.0;
-        } else if (ar > 5.0) {
-            timePreempt = 1200.0 - 750.0 * (ar - 5.0) / 5.0;
-        } else {
-            timePreempt = 1200.0;
+        double stackLeniency = beatmap.getStackLeniency() == null ? 0.7 : beatmap.getStackLeniency();
+        if (stackLeniency <= 0) return heights;
+        double timePreempt = ar < 5 ? 1800 - 120 * ar : 1200 - 150 * (ar - 5);
+        double stackThreshold = (int) timePreempt * stackLeniency;
+
+        Point[] positions = new Point[hitObjects.size()];
+        Point[] endPositions = new Point[hitObjects.size()];
+        double[] endTimes = new double[hitObjects.size()];
+        for (int i = 0; i < hitObjects.size(); i++) {
+            HitObject object = hitObjects.get(i);
+            positions[i] = new Point(object.getX(), object.getY());
+            endPositions[i] = positions[i];
+            endTimes[i] = object.getTime();
+            if (object.getObjectType() == HitObject.ObjectType.SPINNER) {
+                endTimes[i] = object.getEndTime();
+            } else if (object.getObjectType() == HitObject.ObjectType.SLIDER) {
+                List<SliderNode> nodes = sliderNodes(beatmap, object);
+                endTimes[i] = nodes.stream().mapToDouble(SliderNode::eventTime).max()
+                        .orElse(object.getTime());
+                double endProgress = (Math.max(1, object.getSlides()) & 1) == 1 ? 1 : 0;
+                endPositions[i] = new SliderPath(object).positionAt(endProgress);
+            }
         }
 
-        double stackLeniencyTime = timePreempt * stackLeniencyMultiplier;
+        for (int i = hitObjects.size() - 1; i > 0; i--) {
+            if (heights[i] != 0 || hitObjects.get(i).getObjectType() == HitObject.ObjectType.SPINNER) {
+                continue;
+            }
 
-        double scale = (1.0 - 0.7 * (cs - 5.0) / 5.0) / 2.0;
-        double stackOffset = scale * 6.4;
+            int current = i;
+            if (hitObjects.get(i).getObjectType() == HitObject.ObjectType.HIT_CIRCLE) {
+                for (int n = i - 1; n >= 0; n--) {
+                    HitObject previous = hitObjects.get(n);
+                    if (previous.getObjectType() == HitObject.ObjectType.SPINNER) continue;
+                    if ((int) hitObjects.get(current).getTime() - (int) endTimes[n] > stackThreshold) break;
 
-        int[] stackHeights = new int[hitObjects.size()];
+                    if (previous.getObjectType() == HitObject.ObjectType.SLIDER
+                            && SliderPath.distance(endPositions[n], positions[current]) < 3) {
+                        int offset = heights[current] - heights[n] + 1;
+                        for (int j = n + 1; j <= i; j++) {
+                            if (SliderPath.distance(endPositions[n], positions[j]) < 3) heights[j] -= offset;
+                        }
+                        break;
+                    }
 
-        for (int i = hitObjects.size() - 1; i >= 0; i--) {
-            HitObject objI = hitObjects.get(i);
-
-            for (int j = i + 1; j < hitObjects.size(); j++) {
-                HitObject objJ = hitObjects.get(j);
-
-                if (objJ.getTime() - objI.getTime() > stackLeniencyTime) break;
-
-                if (Math.abs(objI.getX() - objJ.getX()) < 2 && Math.abs(objI.getY() - objJ.getY()) < 2) {
-                    stackHeights[i] = stackHeights[j] + 1;
-                    break;
+                    if (SliderPath.distance(positions[n], positions[current]) < 3) {
+                        heights[n] = heights[current] + 1;
+                        current = n;
+                    }
+                }
+            } else if (hitObjects.get(i).getObjectType() == HitObject.ObjectType.SLIDER) {
+                for (int n = i - 1; n >= 0; n--) {
+                    HitObject previous = hitObjects.get(n);
+                    if (previous.getObjectType() == HitObject.ObjectType.SPINNER) continue;
+                    if (hitObjects.get(current).getTime() - previous.getTime() > stackThreshold) break;
+                    if (SliderPath.distance(endPositions[n], positions[current]) < 3) {
+                        heights[n] = heights[current] + 1;
+                        current = n;
+                    }
                 }
             }
         }
-
-        for (int i = 0; i < hitObjects.size(); i++) {
-            if (stackHeights[i] > 0) {
-                HitObject obj = hitObjects.get(i);
-                int shift = (int) (stackHeights[i] * stackOffset);
-
-                obj.setX(obj.getX() - shift);
-                obj.setY(obj.getY() - shift);
-            }
-        }
+        return heights;
     }
 
     public static double calculateWindowAccuracy(ReplayAnalyze replayAnalyze, long startTime, long endTime) {

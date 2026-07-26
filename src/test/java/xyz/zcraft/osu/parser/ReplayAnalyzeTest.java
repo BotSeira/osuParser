@@ -59,32 +59,6 @@ public class ReplayAnalyzeTest {
                 }
             }
 
-            if (Boolean.getBoolean("replayAnalyze.diagnostic")) {
-                System.out.printf(" results=%s ticks=%d ends=%d spins=%d bonuses=%d%n",
-                        hitResults, sliderTicks, sliderEnds, spinnerSpins, spinnerBonuses);
-                HashMap<HitEvent.HitResult, Long> sliderAdjusted = new HashMap<>(hitResults);
-                for (HitEvent head : analyze.events()) {
-                    if (head.eventType() != HitEvent.EventType.SLIDER_HEAD) continue;
-                    List<HitEvent> sliderEvents = analyze.events().stream()
-                            .filter(event -> event.objectIndex() == head.objectIndex())
-                            .toList();
-                    long hitParts = sliderEvents.stream().filter(HitEvent::wasHit).count();
-                    HitEvent.HitResult finalResult = hitParts == sliderEvents.size()
-                            ? HitEvent.HitResult.PERFECT
-                            : hitParts * 2 >= sliderEvents.size()
-                            ? HitEvent.HitResult.OK
-                            : hitParts > 0 ? HitEvent.HitResult.MEH : HitEvent.HitResult.MISS;
-                    sliderAdjusted.merge(head.hitResult(), -1L, Long::sum);
-                    sliderAdjusted.merge(finalResult, 1L, Long::sum);
-                }
-                System.out.printf(" slider-adjusted=%s%n", sliderAdjusted);
-                System.out.printf(" slider-heads=%s%n", analyze.events().stream()
-                        .filter(event -> event.eventType() == HitEvent.EventType.SLIDER_HEAD)
-                        .collect(java.util.stream.Collectors.groupingBy(HitEvent::hitResult,
-                                java.util.stream.Collectors.counting())));
-                continue;
-            }
-
             assertEquals(testCase.expected().hitResults().ok(), hitResults.getOrDefault(HitEvent.HitResult.OK, 0L));
             assertEquals(testCase.expected().hitResults().meh(), hitResults.getOrDefault(HitEvent.HitResult.MEH, 0L));
 
