@@ -1,0 +1,92 @@
+{
+  "testCases": [
+    {
+      "name": "Science (feat. Kasane Teto) [Solution]",
+      "beatmap": "4991747.osu",
+      "replay": "solo-replay-osu_4991747_6858800449.osr",
+      "expected": {
+        "score": 677352,
+        "maxCombo": 435,
+        "accuracy": 0.9793,
+        "pp": 166.1,
+        "mods": [],
+        "hitResults": {
+          "perfect": 670,
+          "ok": 7,
+          "meh": 0,
+          "miss": 12,
+          "sliderTick": 2,
+          "sliderEnd": 234,
+          "spinnerBonus": 0,
+          "spinnerSpin": 0
+        }
+      }
+    },
+    {
+      "name": "Pokkan Color [Super Extra Color]",
+      "beatmap": "5198852.osu",
+      "replay": "solo-replay-osu_5198852_6610582386.osr",
+      "expected": {
+        "score": 419616,
+        "maxCombo": 117,
+        "accuracy": 0.9106,
+        "pp": 59.2,
+        "mods": [],
+        "hitResults": {
+          "perfect": 795,
+          "ok": 63,
+          "meh": 13,
+          "miss": 32,
+          "sliderTick": 38,
+          "sliderEnd": 150,
+          "spinnerBonus": 33,
+          "spinnerSpin": 52
+        }
+      }
+    },
+    {
+      "name": "dj TAKA - quaver (Sotarks) [Doormat's Extra]",
+      "beatmap": "dj TAKA - quaver (Sotarks) [Doormat's Extra].osu",
+      "replay": "solo-replay-osu_1859185_6851852398.osr",
+      "expected": {
+        "score": 854627,
+        "maxCombo": 337,
+        "accuracy": 0.9821,
+        "pp": 145.4,
+        "mods": [],
+        "hitResults": {
+          "perfect": 266,
+          "ok": 4,
+          "meh": 0,
+          "miss": 3,
+          "sliderTick": 55,
+          "sliderEnd": 77,
+          "spinnerBonus": 12,
+          "spinnerSpin": 28
+        }
+      }
+    },
+    {
+      "name": "yaseta - Bluenation (Share) [Eden]",
+      "beatmap": "yaseta - Bluenation (Share) [Eden].osu",
+      "replay": "solo-replay-osu_5349820_6942341720.osr",
+      "expected": {
+        "score": 707446,
+        "maxCombo": 1384,
+        "accuracy": 0.9605,
+        "pp": 195.8,
+        "mods": [],
+        "hitResults": {
+          "perfect": 1409,
+          "ok": 88,
+          "meh": 5,
+          "miss": 5,
+          "sliderTick": 176,
+          "sliderEnd": 532,
+          "spinnerBonus": 5,
+          "spinnerSpin": 11
+        }
+      }
+    }
+  ]
+}

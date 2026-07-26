@@ -2,7 +2,6 @@ package xyz.zcraft.osu.parser;
 
 import module java.base;
 import org.junit.jupiter.api.Test;
-import xyz.zcraft.osu.parser.data.beatmap.DiffSpec;
 import xyz.zcraft.osu.parser.data.beatmap.OsuBeatmap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
