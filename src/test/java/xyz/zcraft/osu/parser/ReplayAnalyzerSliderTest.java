@@ -116,7 +116,7 @@ class ReplayAnalyzerSliderTest {
     private static OsuReplay replay(String hash, List<OsuReplay.TimedKeyFrame> frames) {
         return new OsuReplay((byte) 0, 0, hash, "player", "replay", (short) 1,
                 (short) 0, (short) 0, (short) 0, (short) 0, (short) 0,
-                300, (short) 1, true, 0, "", 0, frames);
+                300, (short) 1, true, 0, "", 0, frames, 0, null);
     }
 
     private static OsuReplay.TimedKeyFrame frame(long time, float x, float y, int key) {

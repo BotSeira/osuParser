@@ -4,6 +4,8 @@
       "name": "Science (feat. Kasane Teto) [Solution]",
       "beatmap": "4991747.osu",
       "replay": "solo-replay-osu_4991747_6858800449.osr",
+      "lazer": true,
+      "scoreId": 6858800449,
       "expected": {
         "score": 677352,
         "maxCombo": 435,
@@ -26,6 +28,8 @@
       "name": "Pokkan Color [Super Extra Color]",
       "beatmap": "5198852.osu",
       "replay": "solo-replay-osu_5198852_6610582386.osr",
+      "lazer": true,
+      "scoreId": 6610582386,
       "expected": {
         "score": 419616,
         "maxCombo": 117,
@@ -48,6 +52,8 @@
       "name": "dj TAKA - quaver (Sotarks) [Doormat's Extra]",
       "beatmap": "dj TAKA - quaver (Sotarks) [Doormat's Extra].osu",
       "replay": "solo-replay-osu_1859185_6851852398.osr",
+      "lazer": true,
+      "scoreId": 6851852398,
       "expected": {
         "score": 854627,
         "maxCombo": 337,
@@ -70,6 +76,8 @@
       "name": "yaseta - Bluenation (Share) [Eden]",
       "beatmap": "yaseta - Bluenation (Share) [Eden].osu",
       "replay": "solo-replay-osu_5349820_6942341720.osr",
+      "lazer": true,
+      "scoreId": 6942341720,
       "expected": {
         "score": 707446,
         "maxCombo": 1384,
@@ -85,6 +93,26 @@
           "sliderEnd": 532,
           "spinnerBonus": 5,
           "spinnerSpin": 11
+        }
+      }
+    },
+    {
+      "name": "zayre_x - Krewella - Say Goodbye (Nightcore & Cut Ver.) [Another] (2026-03-18) Osu",
+      "beatmap": "Krewella - Say Goodbye (Nightcore & Cut Ver.) (A r M i N) [Another].osu",
+      "replay": "zayre_x - Krewella - Say Goodbye (Nightcore & Cut Ver.) [Another] (2026-03-18) Osu.osr",
+      "lazer": false,
+      "scoreId": 4998451448,
+      "expected": {
+        "score": 663830,
+        "maxCombo": 179,
+        "accuracy": 0.9510,
+        "pp": null,
+        "mods": [],
+        "hitResults": {
+          "perfect": 191,
+          "ok": 9,
+          "meh": 0,
+          "miss": 4
         }
       }
     }

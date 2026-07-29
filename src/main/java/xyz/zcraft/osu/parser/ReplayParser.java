@@ -1,13 +1,14 @@
 package xyz.zcraft.osu.parser;
 
+import com.google.gson.Gson;
 import org.apache.commons.compress.compressors.lzma.LZMACompressorInputStream;
 import xyz.zcraft.osu.parser.data.replay.OsuReplay;
+import xyz.zcraft.osu.parser.data.replay.ReplayInfo;
 import xyz.zcraft.osu.parser.exception.ParseException;
 
-import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
+import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
@@ -18,6 +19,8 @@ import java.util.LinkedList;
 import java.util.List;
 
 public class ReplayParser {
+    private static final Gson GSON = new Gson();
+
     public static OsuReplay parseReplay(Path filePath) throws ParseException {
         try {
             byte[] bytes = Files.readAllBytes(filePath);
@@ -55,15 +58,46 @@ public class ReplayParser {
 
         final List<OsuReplay.KeyFrame> keyFrames = parseReplayFrames(buffer);
 
-        if (keyFrames == null) {
-            throw new ParseException("Failed to parse replay frames");
-        }
-
         final List<OsuReplay.TimedKeyFrame> timedKeyFrames = timeKeyFrame(keyFrames);
+
+        long legacyScoreId = readLegacyScoreId(buffer, gameVersion);
+        var replayInfo = readReplayInfo(buffer, gameVersion);
 
         return new OsuReplay(gameMode, gameVersion, beatmapHash, playerName, replayHash,
                 count300, count100, count50, countGeki, countKatu, countMiss,
-                totalScore, maxCombo, perfectCombo == 1, mods, lifeBarGraph, timestamp, timedKeyFrames);
+                totalScore, maxCombo, perfectCombo == 1, mods, lifeBarGraph, timestamp, timedKeyFrames,
+                legacyScoreId, replayInfo);
+    }
+
+    private static long readLegacyScoreId(ByteBuffer buffer, int gameVersion) throws ParseException {
+        try {
+            long id;
+
+            if (gameVersion >= 20140721) {
+                id = buffer.getLong();
+            } else if (gameVersion >= 20121008) {
+                id = Integer.toUnsignedLong(buffer.getInt());
+            } else {
+                return -1;
+            }
+
+            return id == 0 ? -1 : id;
+        } catch (BufferUnderflowException e) {
+            throw new ParseException("Replay ended before the legacy score ID", e);
+        }
+    }
+
+    private static ReplayInfo readReplayInfo(ByteBuffer buffer, int gameVersion) throws ParseException {
+        if (gameVersion < 30000001) {
+            return null;
+        }
+
+        try {
+            final String s = readCompressedData(buffer);
+            return GSON.fromJson(s, ReplayInfo.class);
+        } catch (BufferUnderflowException e) {
+            throw new ParseException("Byte underflow reading replay info", e);
+        }
     }
 
     private static String readOsuString(ByteBuffer buffer) {
@@ -78,6 +112,10 @@ public class ReplayParser {
     }
 
     private static List<OsuReplay.KeyFrame> parseReplayFrames(ByteBuffer buffer) throws ParseException {
+        return analyzeFrames(readCompressedData(buffer));
+    }
+
+    private static String readCompressedData(ByteBuffer buffer) throws ParseException {
         int compressedDataLength = buffer.getInt();
 
         byte[] compressedBytes = new byte[compressedDataLength];
@@ -85,19 +123,14 @@ public class ReplayParser {
 
         ByteArrayInputStream bais = new ByteArrayInputStream(compressedBytes);
 
-        try (LZMACompressorInputStream lzmaIn = new LZMACompressorInputStream(bais);
-             BufferedReader reader = new BufferedReader(new InputStreamReader(lzmaIn, StandardCharsets.UTF_8))) {
-
-            String replayDataString = reader.readLine();
-
-            if (replayDataString != null) {
-                return analyzeFrames(replayDataString);
-            }
+        try (LZMACompressorInputStream lzmaIn = new LZMACompressorInputStream(bais)) {
+            return new String(
+                    lzmaIn.readAllBytes(),
+                    StandardCharsets.UTF_8
+            );
         } catch (IOException e) {
-            throw new ParseException("Failed to parse replay frames", e);
+            throw new ParseException("Failed to read compressed data", e);
         }
-
-        return null;
     }
 
     private static List<OsuReplay.TimedKeyFrame> timeKeyFrame(List<OsuReplay.KeyFrame> keyFrames) {

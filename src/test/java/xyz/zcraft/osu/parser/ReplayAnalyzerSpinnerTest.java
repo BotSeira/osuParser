@@ -155,7 +155,7 @@ class ReplayAnalyzerSpinnerTest {
     private static OsuReplay replay(List<OsuReplay.TimedKeyFrame> frames, int mods) {
         return new OsuReplay((byte) 0, 20250701, "spinner-test", "player", "replay",
                 (short) 0, (short) 0, (short) 0, (short) 0, (short) 0, (short) 0,
-                0, (short) 0, false, mods, "", 0, frames);
+                0, (short) 0, false, mods, "", 0, frames, 0, null);
     }
 
     private static List<OsuReplay.TimedKeyFrame> spinFrames(double rotations, int key) {

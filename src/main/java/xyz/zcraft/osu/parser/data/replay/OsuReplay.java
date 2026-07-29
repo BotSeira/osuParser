@@ -20,7 +20,9 @@ public record OsuReplay(
         int mods,
         String lifeBarGraph,
         long timestamp,
-        List<TimedKeyFrame> timedKeyFrames
+        List<TimedKeyFrame> timedKeyFrames,
+        long legacyScoreId,
+        ReplayInfo replayInfo
 ) {
     public record KeyFrame(
             long offset,
