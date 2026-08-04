@@ -29,5 +29,5 @@ public class HitObject {
         HIT_CIRCLE, SLIDER, SPINNER
     }
 
-    public record ControlPoint(int x, int y){}
+    public record ControlPoint(double x, double y){}
 }

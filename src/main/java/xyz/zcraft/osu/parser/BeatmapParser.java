@@ -233,7 +233,7 @@ class BeatmapFileParser {
                 obj.setCurveType(curveData[0]);
                 for (int i = 1; i < curveData.length; i++) {
                     String[] coords = curveData[i].split(":");
-                    obj.getControlPoints().add(new HitObject.ControlPoint(Integer.parseInt(coords[0]), Integer.parseInt(coords[1])));
+                    obj.getControlPoints().add(new HitObject.ControlPoint(Double.parseDouble(coords[0]), Double.parseDouble(coords[1])));
                 }
             }
             if (parts.length > 6) obj.setSlides(Integer.parseInt(parts[6]));
