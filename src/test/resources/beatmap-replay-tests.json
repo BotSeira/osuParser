@@ -115,6 +115,54 @@
           "miss": 4
         }
       }
+    },
+    {
+      "name": "HR",
+      "beatmap": "Simon Safhalter - Always a cycle (GLB Toxic Remix) (Djulus) [k0alcj's Insane].osu",
+      "replay": "solo-replay-osu_5290576_6235382566.osr",
+      "lazer": true,
+      "scoreId": 6235382566,
+      "expected": {
+        "score": 632516,
+        "maxCombo": 771,
+        "accuracy": 0.8954,
+        "pp": 96,
+        "mods": ["HR", "HD"],
+        "hitResults": {
+          "perfect": 591,
+          "ok": 131,
+          "meh": 4,
+          "miss": 8,
+          "sliderTick": 131,
+          "sliderEnd": 403,
+          "spinnerBonus": 2,
+          "spinnerSpin": 32
+        }
+      }
+    },
+    {
+      "name": "HR2",
+      "beatmap": "kz feat. Kaguya (CV Yuko Natsuyoshi) - Reply (Setu) [Distant].osu",
+      "replay": "solo-replay-osu_5522425_6969387972.osr",
+      "lazer": true,
+      "scoreId": 6969387972,
+      "expected": {
+        "score": 829585,
+        "maxCombo": 760,
+        "accuracy": 0.9696,
+        "pp": 201,
+        "mods": ["HR"],
+        "hitResults": {
+          "perfect": 842,
+          "ok": 46,
+          "meh": 0,
+          "miss": 2,
+          "sliderTick": 54,
+          "sliderEnd": 361,
+          "spinnerBonus": 13,
+          "spinnerSpin": 34
+        }
+      }
     }
   ]
 }

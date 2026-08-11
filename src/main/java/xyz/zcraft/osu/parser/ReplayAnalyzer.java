@@ -8,30 +8,39 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class ReplayAnalyzer {
+    private static final int HARD_ROCK_MOD = 16;
     private static final int AUTO_MOD = 2048;
     private static final int SPUN_OUT_MOD = 4096;
+    private static final double PLAYFIELD_HEIGHT = 384;
     private static final double AUTO_SPINNER_RPM = 477.26;
     private static final double SPUN_OUT_SPINNER_RPM = 286.48;
     private static final double TWO_PI = Math.PI * 2;
     private static final int SPINNER_BONUS_GAP = 2;
 
     public static ReplayAnalyze analyze(OsuBeatmap beatmap, OsuReplay replay) throws ParseException {
-        final List<OsuReplay.TimedKeyFrame> keyFrames = replay.timedKeyFrames();
-        List<HitEvent> events = new ArrayList<>();
-
-        if (keyFrames == null || keyFrames.isEmpty() || beatmap == null || beatmap.getHitObjects() == null) {
+        if (beatmap == null || replay == null) {
             throw new ParseException("Replay or beatmap data is incomplete");
         }
+
+        final List<OsuReplay.TimedKeyFrame> keyFrames = replay.timedKeyFrames();
+        if (keyFrames == null || keyFrames.isEmpty() || beatmap.getHitObjects() == null) {
+            throw new ParseException("Replay or beatmap data is incomplete");
+        }
+
+        List<HitEvent> events = new ArrayList<>();
 
         if (!Objects.equals(replay.beatmapHash(), beatmap.getHash())) {
             throw new ParseException("Beatmap hash mismatch");
         }
 
-        final DifficultyAttribute diff = BeatmapAnalyzer.calculateDifficulty(beatmap, replay.mods());
+        final int mods = effectiveLegacyMods(replay);
+        final boolean hardRock = (mods & HARD_ROCK_MOD) != 0;
+        final DifficultyAttribute diff = BeatmapAnalyzer.calculateDifficulty(beatmap, mods);
 
         final double circleRadius = diff.getCircleRadiusInPixel();
         int[] stackHeights = calculateStackHeights(beatmap, diff.ar());
@@ -49,7 +58,7 @@ public class ReplayAnalyzer {
             HitObject hitObject = hitObjects.get(objIndex);
             double objectStackOffset = stackHeights[objIndex] * stackOffsetUnit;
             double objectX = hitObject.getX() - objectStackOffset;
-            double objectY = hitObject.getY() - objectStackOffset;
+            double objectY = playfieldY(hitObject.getY(), hardRock) - objectStackOffset;
 
             if (hitObject.getObjectType() != HitObject.ObjectType.HIT_CIRCLE
                     && hitObject.getObjectType() != HitObject.ObjectType.SLIDER
@@ -59,7 +68,7 @@ public class ReplayAnalyzer {
 
             if (hitObject.getObjectType() == HitObject.ObjectType.SPINNER) {
                 List<HitEvent> spinnerEvents = analyzeSpinner(hitObject, objIndex, keyFrames,
-                        diff, replay.mods());
+                        diff, mods, hardRock);
                 events.addAll(spinnerEvents);
                 keyFrameIndex.set(Math.max(keyFrameIndex.get(), spinnerEvents.getFirst().frameIndex()));
                 continue;
@@ -114,7 +123,8 @@ public class ReplayAnalyzer {
                         if (objIndex > 0) {
                             double lastOffset = stackHeights[objIndex - 1] * stackOffsetUnit;
                             double lastX = hitObjects.get(objIndex - 1).getX() - lastOffset;
-                            double lastY = hitObjects.get(objIndex - 1).getY() - lastOffset;
+                            double lastY = playfieldY(
+                                    hitObjects.get(objIndex - 1).getY(), hardRock) - lastOffset;
                             angleFromLast = Math.atan2(objectY - lastY, objectX - lastX);
                         }
 
@@ -132,7 +142,8 @@ public class ReplayAnalyzer {
                             if (objIndex > 0) {
                                 double lastOffset = stackHeights[objIndex - 1] * stackOffsetUnit;
                                 double lastX = hitObjects.get(objIndex - 1).getX() - lastOffset;
-                                double lastY = hitObjects.get(objIndex - 1).getY() - lastOffset;
+                                double lastY = playfieldY(
+                                        hitObjects.get(objIndex - 1).getY(), hardRock) - lastOffset;
                                 angleFromLast = Math.atan2(objectY - lastY, objectX - lastX);
                             }
 
@@ -171,10 +182,11 @@ public class ReplayAnalyzer {
 
             if (hitObject.getObjectType() == HitObject.ObjectType.SLIDER) {
                 events.addAll(analyzeSlider(beatmap, hitObject, objIndex, keyFrames,
-                        circleRadius, event, objectStackOffset));
+                        circleRadius, event, objectStackOffset, hardRock));
             }
         }
 
+        reconcileSliderEndTotals(events, replay);
         reconcileObjectResultTotals(events, replay);
 
         events.sort(Comparator.comparingLong(HitEvent::eventTime)
@@ -187,7 +199,8 @@ public class ReplayAnalyzer {
 
     private static List<HitEvent> analyzeSpinner(HitObject spinner, int objectIndex,
                                                  List<OsuReplay.TimedKeyFrame> keyFrames,
-                                                 DifficultyAttribute difficulty, int mods) {
+                                                 DifficultyAttribute difficulty, int mods,
+                                                 boolean hardRock) {
         long startTime = spinner.getTime();
         long endTime = Math.max(startTime, spinner.getEndTime());
         ReplaySample endSample = sampleAt(keyFrames, endTime);
@@ -208,7 +221,8 @@ public class ReplayAnalyzer {
         SpinnerTracking tracking = automaticRpm > 0
                 ? automaticSpinnerTracking(keyFrames, startTime, endTime, difficulty.clockRate(),
                         automaticRpm, requiredSpins)
-                : spinnerTracking(spinner, keyFrames, startTime, endTime, difficulty.clockRate());
+                : spinnerTracking(spinner, keyFrames, startTime, endTime,
+                        difficulty.clockRate(), hardRock);
         double progress = requiredSpins == 0 ? 1 : tracking.rotations() / requiredSpins;
 
         HitEvent.HitResult result;
@@ -255,10 +269,10 @@ public class ReplayAnalyzer {
     private static SpinnerTracking spinnerTracking(HitObject spinner,
                                                     List<OsuReplay.TimedKeyFrame> keyFrames,
                                                     long startTime, long endTime,
-                                                    double clockRate) {
+                                                    double clockRate, boolean hardRock) {
         ReplaySample previous = sampleAt(keyFrames, startTime);
         long previousTime = startTime;
-        SpinnerTracker tracker = new SpinnerTracker(spinner, clockRate);
+        SpinnerTracker tracker = new SpinnerTracker(spinner, clockRate, hardRock);
         int frameIndex = firstFrameAtOrAfter(keyFrames, startTime);
 
         while (frameIndex < keyFrames.size() && keyFrames.get(frameIndex).time() <= endTime) {
@@ -307,10 +321,62 @@ public class ReplayAnalyzer {
         return actions;
     }
 
+    private static void reconcileSliderEndTotals(List<HitEvent> events, OsuReplay replay) {
+        // Replay cursor frames are lower-frequency than lazer's live slider tracking.
+        // Use the embedded score statistic as the authoritative total and only reassign
+        // the least certain frame-derived tail results when the totals disagree.
+        if (replay.replayInfo() == null || replay.replayInfo().statistics() == null) return;
+        Long targetValue = replay.replayInfo().statistics().get("slider_tail_hit");
+        if (targetValue == null || targetValue < 0 || targetValue > Integer.MAX_VALUE) return;
+
+        List<Integer> sliderEnds = new ArrayList<>();
+        int actualHits = 0;
+        for (int i = 0; i < events.size(); i++) {
+            HitEvent event = events.get(i);
+            if (event.eventType() != HitEvent.EventType.SLIDER_END) continue;
+            sliderEnds.add(i);
+            if (event.wasHit()) actualHits++;
+        }
+
+        int targetHits = targetValue.intValue();
+        if (targetHits > sliderEnds.size() || targetHits == actualHits) return;
+
+        if (actualHits > targetHits) {
+            sliderEnds.stream()
+                    .filter(index -> events.get(index).wasHit())
+                    .sorted(Comparator.comparingDouble(
+                            (Integer index) -> sliderEndUncertainty(events.get(index))).reversed())
+                    .limit(actualHits - targetHits)
+                    .forEach(index -> events.set(index, withSliderEndResult(events.get(index), false)));
+        } else {
+            sliderEnds.stream()
+                    .filter(index -> !events.get(index).wasHit())
+                    .sorted(Comparator.comparingDouble(
+                            index -> sliderEndUncertainty(events.get(index))))
+                    .limit(targetHits - actualHits)
+                    .forEach(index -> events.set(index, withSliderEndResult(events.get(index), true)));
+        }
+    }
+
+    private static double sliderEndUncertainty(HitEvent event) {
+        if ((event.keyFlags() & 15) == 0) return Double.POSITIVE_INFINITY;
+        return event.aimBias() == null ? Double.POSITIVE_INFINITY : event.aimBias().distance();
+    }
+
+    private static HitEvent withSliderEndResult(HitEvent source, boolean hit) {
+        long hitTime = hit ? source.hitTime() : -1L;
+        return new HitEvent(source.objectIndex(), source.hitObject(), source.eventType(),
+                source.eventTime(), hit,
+                hit ? HitEvent.HitResult.PERFECT : HitEvent.HitResult.MISS,
+                source.aimBias(), hitTime,
+                hit ? hitTime - source.eventTime() : Long.MIN_VALUE,
+                source.cursorX(), source.cursorY(), source.keyFlags(), source.frameIndex());
+    }
+
     private static void reconcileObjectResultTotals(List<HitEvent> events, OsuReplay replay) {
         // Legacy replay frames are lossy positional samples, while the replay header stores
         // the authoritative top-level judgement totals. Reconcile only complete plays;
-        // lazer nested slider and spinner results remain entirely frame-derived.
+        // Other nested slider and spinner results remain entirely frame-derived.
         int[] target = {
                 Short.toUnsignedInt(replay.count300()),
                 Short.toUnsignedInt(replay.count100()),
@@ -381,11 +447,13 @@ public class ReplayAnalyzer {
         return middle;
     }
 
-    private static double spinnerRotationBetween(HitObject spinner, ReplaySample from, ReplaySample to) {
+    private static double spinnerRotationBetween(HitObject spinner, ReplaySample from,
+                                                 ReplaySample to, boolean hardRock) {
         double fromX = from.x() - spinner.getX();
-        double fromY = from.y() - spinner.getY();
+        double spinnerY = playfieldY(spinner.getY(), hardRock);
+        double fromY = from.y() - spinnerY;
         double toX = to.x() - spinner.getX();
-        double toY = to.y() - spinner.getY();
+        double toY = to.y() - spinnerY;
 
         double angleDelta = Math.atan2(toY, toX) - Math.atan2(fromY, fromX);
         if (angleDelta > Math.PI) angleDelta -= TWO_PI;
@@ -396,11 +464,11 @@ public class ReplayAnalyzer {
     private static List<HitEvent> analyzeSlider(OsuBeatmap beatmap, HitObject slider, int objectIndex,
                                                 List<OsuReplay.TimedKeyFrame> keyFrames,
                                                 double circleRadius, HitEvent headEvent,
-                                                double stackOffset) {
+                                                double stackOffset, boolean hardRock) {
         List<SliderNode> nodes = sliderNodes(beatmap, slider);
         if (nodes.isEmpty()) return List.of();
 
-        SliderPath path = new SliderPath(slider, stackOffset);
+        SliderPath path = new SliderPath(slider, stackOffset, hardRock);
         List<HitEvent> result = new ArrayList<>(nodes.size());
         // Legacy replay cursor positions are frame-quantised. Keep a small tolerance for
         // small circles so transient interpolation error does not falsely break tracking.
@@ -633,6 +701,45 @@ public class ReplayAnalyzer {
         return Math.hypot(x - point.x(), y - point.y());
     }
 
+    /**
+     * Returns whether the replay enables Hard Rock. Modern lazer replays also carry
+     * mods in replay metadata, so the legacy bit field alone is not authoritative.
+     */
+    public static boolean hasHardRock(OsuReplay replay) {
+        return replay != null && (effectiveLegacyMods(replay) & HARD_ROCK_MOD) != 0;
+    }
+
+    private static int effectiveLegacyMods(OsuReplay replay) {
+        int mods = replay.mods();
+        if (replay.replayInfo() == null || replay.replayInfo().mods() == null) return mods;
+
+        for (var mod : replay.replayInfo().mods()) {
+            if (mod == null || mod.getAcronym() == null) continue;
+            mods |= switch (mod.getAcronym().toUpperCase(Locale.ROOT)) {
+                case "NF" -> 1;
+                case "EZ" -> 2;
+                case "HD" -> 8;
+                case "HR" -> HARD_ROCK_MOD;
+                case "SD" -> 32;
+                case "DT" -> 64;
+                case "RX" -> 128;
+                case "HT" -> 256;
+                case "NC" -> 512;
+                case "FL" -> 1024;
+                case "AT" -> AUTO_MOD;
+                case "SO" -> SPUN_OUT_MOD;
+                case "AP" -> 8192;
+                case "PF" -> 16384;
+                default -> 0;
+            };
+        }
+        return mods;
+    }
+
+    private static double playfieldY(double y, boolean hardRock) {
+        return hardRock ? PLAYFIELD_HEIGHT - y : y;
+    }
+
     private record SliderTiming(double beatLength, double velocityMultiplier) {}
     private record SliderNode(HitEvent.EventType type, double eventTime,
                               double judgementTime, double pathProgress) {}
@@ -644,20 +751,22 @@ public class ReplayAnalyzer {
     private static final class SpinnerTracker {
         private final HitObject spinner;
         private final double clockRate;
+        private final boolean hardRock;
         private final List<SpinnerSpin> fullSpins = new ArrayList<>();
         private double accumulatedRotation;
         private double accumulatedRotationAtLastCompletion;
         private double currentSpinMaxRotation;
 
-        private SpinnerTracker(HitObject spinner, double clockRate) {
+        private SpinnerTracker(HitObject spinner, double clockRate, boolean hardRock) {
             this.spinner = spinner;
             this.clockRate = clockRate;
+            this.hardRock = hardRock;
         }
 
         private void track(long fromTime, ReplaySample from, long toTime, ReplaySample to) {
             if ((to.keyFlags() & 15) == 0) return;
 
-            double delta = spinnerRotationBetween(spinner, from, to) * clockRate;
+            double delta = spinnerRotationBetween(spinner, from, to, hardRock) * clockRate;
             if (delta == 0) return;
 
             accumulatedRotation += delta;
@@ -685,15 +794,17 @@ public class ReplayAnalyzer {
         private final double expectedLength;
 
         private SliderPath(HitObject slider) {
-            this(slider, 0);
+            this(slider, 0, false);
         }
 
-        private SliderPath(HitObject slider, double stackOffset) {
+        private SliderPath(HitObject slider, double stackOffset, boolean hardRock) {
             expectedLength = Math.max(0, slider.getLength());
             List<Point> controls = new ArrayList<>();
-            controls.add(new Point(slider.getX() - stackOffset, slider.getY() - stackOffset));
+            controls.add(new Point(slider.getX() - stackOffset,
+                    playfieldY(slider.getY(), hardRock) - stackOffset));
             for (HitObject.ControlPoint point : slider.getControlPoints()) {
-                controls.add(new Point(point.x() - stackOffset, point.y() - stackOffset));
+                controls.add(new Point(point.x() - stackOffset,
+                        playfieldY(point.y(), hardRock) - stackOffset));
             }
 
             switch (slider.getCurveType() == null ? "L" : slider.getCurveType()) {
@@ -706,7 +817,8 @@ public class ReplayAnalyzer {
                 default -> controls.forEach(this::addPoint);
             }
             if (points.isEmpty()) {
-                addPoint(new Point(slider.getX() - stackOffset, slider.getY() - stackOffset));
+                addPoint(new Point(slider.getX() - stackOffset,
+                        playfieldY(slider.getY(), hardRock) - stackOffset));
             }
             fitToExpectedLength();
             calculateLengths();
