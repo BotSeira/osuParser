@@ -7,6 +7,7 @@ Java library for parsing osu! beatmaps and replays, plus computing difficulty an
 - Parse `.osu` beatmaps into structured data.
 - Parse `.osr` replays and compute replay analytics.
 - Estimate performance points (pp) and difficulty specs using `rosu-pp` via JNA.
+- Categorize beatmaps into various types.
 
 ## Requirements
 
@@ -101,6 +102,28 @@ public class Example {
         double pp = OsuParser.estimatePp(score, beatmap);
         System.out.println(pp);
     }
+}
+```
+
+### Categorize a beatmap
+
+```java
+import xyz.zcraft.osu.model.Score;
+import xyz.zcraft.osu.parser.BeatmapPatternAnalyzer;
+import xyz.zcraft.osu.parser.OsuParser;
+import xyz.zcraft.osu.parser.data.beatmap.BeatmapPatternAnalysis;
+
+import java.nio.file.Path;
+
+public class Example {
+  static void main(String[] args) {
+    Path beatmapFile = Path.of("/path/to/beatmap.osu");
+    OsuBeatmap beatmap = BeatmapParser.parseBeatmap(beatmapFile);
+    DifficultyAttribute attr = new DifficultyAttribute(4, 8, 9, 6, 8, 1);
+
+    final BeatmapPatternAnalysis analyze = BeatmapPatternAnalyzer.analyze(beatmap, attr);
+    System.out.println(analyze.primaryType().type().name());
+  }
 }
 ```
 
