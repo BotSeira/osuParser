@@ -57,6 +57,7 @@ public class OsuParser {
             final var attr = calc.asOsu().difficulty;
             diffSpec.setAim(attr.aim);
             diffSpec.setSpeed(attr.speed);
+            diffSpec.setReading(attr.reading);
 
             diffSpec.setBpm(BeatmapAnalyzer.calculateBpm(beatmap));
 

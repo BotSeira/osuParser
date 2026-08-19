@@ -14,6 +14,7 @@ public final class DiffSpec implements Serializable {
     private double pp95;
     private double aim;
     private double speed;
+    private double reading;
 
     private DifficultyAttribute difficulty;
     private double star;
