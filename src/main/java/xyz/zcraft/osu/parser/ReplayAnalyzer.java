@@ -192,7 +192,7 @@ public class ReplayAnalyzer {
         events.sort(Comparator.comparingLong(HitEvent::eventTime)
                 .thenComparingInt(HitEvent::objectIndex));
 
-        final double ur = calculateUR(events);
+        final double ur = calculateUR(events, diff.clockRate());
 
         return new ReplayAnalyze(beatmap, diff, replay, events, ur);
     }
@@ -984,7 +984,7 @@ public class ReplayAnalyzer {
         }
     }
 
-    public static double calculateUR(List<HitEvent> events) {
+    public static double calculateUR(List<HitEvent> events, double clockRate) {
         List<Long> validOffsets = new LinkedList<>();
 
         for (HitEvent event : events) {
@@ -1013,7 +1013,7 @@ public class ReplayAnalyzer {
 
         double standardDeviation = Math.sqrt(variance);
 
-        return standardDeviation * 10.0;
+        return standardDeviation * 10.0 / clockRate; // cv. UR
     }
 
     private static int[] calculateStackHeights(OsuBeatmap beatmap, double ar) {
