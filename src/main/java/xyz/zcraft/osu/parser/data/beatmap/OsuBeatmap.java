@@ -9,6 +9,8 @@ import java.util.List;
 
 @Data
 public class OsuBeatmap {
+    private int fileFormatVersion;
+
     private String hash;
     private double bpm;
     private double hitLength;
@@ -54,7 +56,7 @@ public class OsuBeatmap {
     // [Difficulty]
     private Double hp;
     private Double cs;
-    private Double ar;
+    private Double ar = Double.NaN;
     private Double od;
     private Double sliderMultiplier;
     private Double sliderTickRate;

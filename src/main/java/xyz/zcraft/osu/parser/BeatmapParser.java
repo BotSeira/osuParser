@@ -41,6 +41,12 @@ public class BeatmapParser {
                 while ((line = reader.readLine()) != null) {
                     line = line.trim();
 
+                    if (line.startsWith("osu file format v")) {
+                        beatmap.setFileFormatVersion(
+                                Integer.parseInt(line.substring("osu file format v".length()))
+                        );
+                        continue;
+                    }
 
                     if (line.startsWith("[") && line.endsWith("]")) {
                         currentSection = line;
@@ -64,6 +70,12 @@ public class BeatmapParser {
             }
 
             beatmap.setBpm(BeatmapAnalyzer.calculateBpm(beatmap));
+
+            // Old beatmaps may not have an explicit ApproachRate.
+            // In that case AR inherits OD.
+            if (Double.isNaN(beatmap.getAr())) {
+                beatmap.setAr(beatmap.getOd());
+            }
 
             final Pair<Integer, Integer> len = BeatmapAnalyzer.calculateLengths(beatmap);
 
