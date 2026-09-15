@@ -1,5 +1,7 @@
 package xyz.zcraft.osu.parser;
 
+import desu.life.RosuFFI;
+import xyz.zcraft.osu.parser.data.PerformanceState;
 import xyz.zcraft.osu.parser.data.replay.*;
 import xyz.zcraft.osu.parser.data.beatmap.*;
 import xyz.zcraft.osu.parser.exception.ParseException;
@@ -1124,5 +1126,36 @@ public class ReplayAnalyzer {
         if (absoluteOffset <= difficulty.getOkWindow()) return HitEvent.HitResult.OK;
         if (absoluteOffset <= difficulty.getMehWindow()) return HitEvent.HitResult.MEH;
         return HitEvent.HitResult.MISS;
+    }
+
+    public static boolean isComboEvent(HitEvent event) {
+        return switch (event.eventType()) {
+            case HIT_CIRCLE, SLIDER_HEAD, SLIDER_TICK, SLIDER_END, SPINNER -> true;
+            case SPINNER_SPIN, SPINNER_BONUS -> false;
+        };
+    }
+
+    public static void applyPerformanceState(
+            RosuFFI.Performance performance,
+            PerformanceState state,
+            long passedObjects,
+            long maxCombo
+    ) {
+        performance.passedObjects(passedObjects);
+        performance.n300(state.n300);
+        performance.n100(state.n100);
+        performance.n50(state.n50);
+        performance.misses(state.misses);
+        performance.combo(maxCombo);
+    }
+
+    public static double calculatePp(
+            RosuFFI.Beatmap beatmap, RosuFFI.Mods mods, PerformanceState state, long passedObjects
+    ) {
+        try (var performance = new RosuFFI.Performance()) {
+            performance.mods(mods);
+            applyPerformanceState(performance, state, passedObjects, state.maxCombo);
+            return performance.calculate(beatmap).asOsu().pp;
+        }
     }
 }
