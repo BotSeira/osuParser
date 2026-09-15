@@ -1,6 +1,7 @@
 package xyz.zcraft.osu.parser;
 
 import desu.life.RosuFFI;
+import xyz.zcraft.osu.model.Mod;
 import xyz.zcraft.osu.parser.data.PerformanceState;
 import xyz.zcraft.osu.parser.data.replay.*;
 import xyz.zcraft.osu.parser.data.beatmap.*;
@@ -1149,13 +1150,22 @@ public class ReplayAnalyzer {
         performance.combo(maxCombo);
     }
 
-    public static double calculatePp(
+    private static double calculatePp(
             RosuFFI.Beatmap beatmap, RosuFFI.Mods mods, PerformanceState state, long passedObjects
     ) {
         try (var performance = new RosuFFI.Performance()) {
             performance.mods(mods);
             applyPerformanceState(performance, state, passedObjects, state.maxCombo);
             return performance.calculate(beatmap).asOsu().pp;
+        }
+    }
+
+    public static double calculatePp(
+            OsuBeatmap beatmap, int modBits, PerformanceState state, long passedObjects
+    ) {
+        try (final RosuFFI.Beatmap rosuBeatmap = new RosuFFI.Beatmap(beatmap.toBeatmapString().getBytes());
+             final RosuFFI.Mods rosuMods = RosuFFI.Mods.fromBits(modBits, RosuFFI.Mode.Osu)) {
+            return calculatePp(rosuBeatmap, rosuMods, state, passedObjects);
         }
     }
 }
