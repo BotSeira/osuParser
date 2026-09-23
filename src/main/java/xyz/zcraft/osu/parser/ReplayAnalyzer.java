@@ -196,8 +196,63 @@ public class ReplayAnalyzer {
                 .thenComparingInt(HitEvent::objectIndex));
 
         final double ur = calculateUR(events, diff.clockRate());
+        final double aimUr = calculateAimUR(events);
 
-        return new ReplayAnalyze(beatmap, diff, replay, events, ur);
+        return new ReplayAnalyze(beatmap, diff, replay, events, ur, aimUr);
+    }
+
+    private static double calculateAimUR(List<HitEvent> events) {
+        double sumX = 0.0;
+        double sumY = 0.0;
+        int count = 0;
+
+        for (HitEvent event : events) {
+            if (!event.wasHit()
+                    || !event.isObjectStart()
+                    || event.eventType() == HitEvent.EventType.SPINNER) {
+                continue;
+            }
+
+            var bias = event.aimBias().standardize();
+
+            double x = Math.cos(bias.theta()) * bias.distance();
+            double y = Math.sin(bias.theta()) * bias.distance();
+
+            sumX += x;
+            sumY += y;
+            count++;
+        }
+
+        if (count == 0) {
+            return 0.0;
+        }
+
+        double meanX = sumX / count;
+        double meanY = sumY / count;
+
+        double squaredDeviationSum = 0.0;
+
+        for (HitEvent event : events) {
+            if (!event.wasHit()
+                    || !event.isObjectStart()
+                    || event.eventType() == HitEvent.EventType.SPINNER) {
+                continue;
+            }
+
+            var bias = event.aimBias().standardize();
+
+            double x = Math.cos(bias.theta()) * bias.distance();
+            double y = Math.sin(bias.theta()) * bias.distance();
+
+            double dx = x - meanX;
+            double dy = y - meanY;
+
+            squaredDeviationSum += dx * dx + dy * dy;
+        }
+
+        double variance = squaredDeviationSum / count;
+
+        return Math.sqrt(variance) * 10.0;
     }
 
     private static List<HitEvent> analyzeSpinner(HitObject spinner, int objectIndex,

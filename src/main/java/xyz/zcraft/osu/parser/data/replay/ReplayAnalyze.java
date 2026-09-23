@@ -10,6 +10,7 @@ public record ReplayAnalyze(
         DifficultyAttribute calculatedDifficulty,
         OsuReplay replay,
         List<HitEvent> events,
-        double unstableRate
+        double unstableRate,
+        double aimUnstableRate
 ) {
 }
