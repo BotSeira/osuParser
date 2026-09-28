@@ -1,18 +1,16 @@
 package xyz.zcraft.osu.parser;
 
 import desu.life.RosuFFI;
-import xyz.zcraft.osu.model.Mod;
 import xyz.zcraft.osu.parser.data.PerformanceState;
-import xyz.zcraft.osu.parser.data.replay.*;
-import xyz.zcraft.osu.parser.data.beatmap.*;
+import xyz.zcraft.osu.parser.data.beatmap.DifficultyAttribute;
+import xyz.zcraft.osu.parser.data.beatmap.HitObject;
+import xyz.zcraft.osu.parser.data.beatmap.OsuBeatmap;
+import xyz.zcraft.osu.parser.data.replay.HitEvent;
+import xyz.zcraft.osu.parser.data.replay.OsuReplay;
+import xyz.zcraft.osu.parser.data.replay.ReplayAnalyze;
 import xyz.zcraft.osu.parser.exception.ParseException;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Locale;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class ReplayAnalyzer {
@@ -209,7 +207,8 @@ public class ReplayAnalyzer {
         for (HitEvent event : events) {
             if (!event.wasHit()
                     || !event.isObjectStart()
-                    || event.eventType() == HitEvent.EventType.SPINNER) {
+                    || event.eventType() == HitEvent.EventType.SPINNER
+                    || event.aimBias() == null) {
                 continue;
             }
 
@@ -278,9 +277,9 @@ public class ReplayAnalyzer {
         double automaticRpm = automaticSpinnerRpm(mods);
         SpinnerTracking tracking = automaticRpm > 0
                 ? automaticSpinnerTracking(keyFrames, startTime, endTime, difficulty.clockRate(),
-                        automaticRpm, requiredSpins)
+                automaticRpm, requiredSpins)
                 : spinnerTracking(spinner, keyFrames, startTime, endTime,
-                        difficulty.clockRate(), hardRock);
+                difficulty.clockRate(), hardRock);
         double progress = requiredSpins == 0 ? 1 : tracking.rotations() / requiredSpins;
 
         HitEvent.HitResult result;
@@ -325,9 +324,9 @@ public class ReplayAnalyzer {
     }
 
     private static SpinnerTracking spinnerTracking(HitObject spinner,
-                                                    List<OsuReplay.TimedKeyFrame> keyFrames,
-                                                    long startTime, long endTime,
-                                                    double clockRate, boolean hardRock) {
+                                                   List<OsuReplay.TimedKeyFrame> keyFrames,
+                                                   long startTime, long endTime,
+                                                   double clockRate, boolean hardRock) {
         ReplaySample previous = sampleAt(keyFrames, startTime);
         long previousTime = startTime;
         SpinnerTracker tracker = new SpinnerTracker(spinner, clockRate, hardRock);
@@ -351,9 +350,9 @@ public class ReplayAnalyzer {
     }
 
     private static SpinnerTracking automaticSpinnerTracking(List<OsuReplay.TimedKeyFrame> keyFrames,
-                                                             long startTime, long endTime,
-                                                             double clockRate, double rpm,
-                                                             int requiredSpins) {
+                                                            long startTime, long endTime,
+                                                            double clockRate, double rpm,
+                                                            int requiredSpins) {
         double durationSeconds = (endTime - startTime) / 1000.0 / clockRate;
         double rotations = Math.max(requiredSpins, durationSeconds * rpm / 60);
         int fullSpins = (int) Math.floor(rotations + 1e-7);
@@ -798,250 +797,6 @@ public class ReplayAnalyzer {
         return hardRock ? PLAYFIELD_HEIGHT - y : y;
     }
 
-    private record SliderTiming(double beatLength, double velocityMultiplier) {}
-    private record SliderNode(HitEvent.EventType type, double eventTime,
-                              double judgementTime, double pathProgress) {}
-    private record SpinnerTracking(double rotations, List<SpinnerSpin> fullSpins) {}
-    private record SpinnerSpin(long time, ReplaySample sample) {}
-    private record ReplaySample(double x, double y, int keyFlags, int frameIndex) {}
-    private record Point(double x, double y) {}
-
-    private static final class SpinnerTracker {
-        private final HitObject spinner;
-        private final double clockRate;
-        private final boolean hardRock;
-        private final List<SpinnerSpin> fullSpins = new ArrayList<>();
-        private double accumulatedRotation;
-        private double accumulatedRotationAtLastCompletion;
-        private double currentSpinMaxRotation;
-
-        private SpinnerTracker(HitObject spinner, double clockRate, boolean hardRock) {
-            this.spinner = spinner;
-            this.clockRate = clockRate;
-            this.hardRock = hardRock;
-        }
-
-        private void track(long fromTime, ReplaySample from, long toTime, ReplaySample to) {
-            if ((to.keyFlags() & 15) == 0) return;
-
-            double delta = spinnerRotationBetween(spinner, from, to, hardRock) * clockRate;
-            if (delta == 0) return;
-
-            accumulatedRotation += delta;
-            double currentSpinRotation = accumulatedRotation - accumulatedRotationAtLastCompletion;
-            currentSpinMaxRotation = Math.max(currentSpinMaxRotation, Math.abs(currentSpinRotation));
-
-            while (currentSpinMaxRotation >= TWO_PI) {
-                int direction = currentSpinRotation < 0 ? -1 : 1;
-                fullSpins.add(new SpinnerSpin(toTime, to));
-                accumulatedRotationAtLastCompletion += direction * TWO_PI;
-                currentSpinRotation = accumulatedRotation - accumulatedRotationAtLastCompletion;
-                currentSpinMaxRotation = Math.abs(currentSpinRotation);
-            }
-        }
-
-        private SpinnerTracking result() {
-            return new SpinnerTracking(fullSpins.size() + currentSpinMaxRotation / TWO_PI,
-                    List.copyOf(fullSpins));
-        }
-    }
-
-    private static final class SliderPath {
-        private final List<Point> points = new ArrayList<>();
-        private final List<Double> cumulativeLength = new ArrayList<>();
-        private final double expectedLength;
-
-        private SliderPath(HitObject slider) {
-            this(slider, 0, false);
-        }
-
-        private SliderPath(HitObject slider, double stackOffset, boolean hardRock) {
-            expectedLength = Math.max(0, slider.getLength());
-            List<Point> controls = new ArrayList<>();
-            controls.add(new Point(slider.getX() - stackOffset,
-                    playfieldY(slider.getY(), hardRock) - stackOffset));
-            for (HitObject.ControlPoint point : slider.getControlPoints()) {
-                controls.add(new Point(point.x() - stackOffset,
-                        playfieldY(point.y(), hardRock) - stackOffset));
-            }
-
-            switch (slider.getCurveType() == null ? "L" : slider.getCurveType()) {
-                case "B" -> addBezierSegments(controls);
-                case "C" -> addCatmull(controls);
-                case "P" -> {
-                    if (controls.size() == 3 && !addPerfectCurve(controls)) addBezier(controls);
-                    else if (controls.size() != 3) addBezierSegments(controls);
-                }
-                default -> controls.forEach(this::addPoint);
-            }
-            if (points.isEmpty()) {
-                addPoint(new Point(slider.getX() - stackOffset,
-                        playfieldY(slider.getY(), hardRock) - stackOffset));
-            }
-            fitToExpectedLength();
-            calculateLengths();
-        }
-
-        private Point positionAt(double progress) {
-            if (points.size() == 1 || expectedLength <= 0) return points.getFirst();
-            double target = Math.clamp(progress, 0, 1) * expectedLength;
-            int index = java.util.Collections.binarySearch(cumulativeLength, target);
-            if (index >= 0) return points.get(index);
-            index = -index - 1;
-            if (index <= 0) return points.getFirst();
-            if (index >= points.size()) return points.getLast();
-            double from = cumulativeLength.get(index - 1);
-            double to = cumulativeLength.get(index);
-            if (to <= from) return points.get(index - 1);
-            double weight = (target - from) / (to - from);
-            return interpolate(points.get(index - 1), points.get(index), weight);
-        }
-
-        private void addBezierSegments(List<Point> controls) {
-            List<Point> segment = new ArrayList<>();
-            segment.add(controls.getFirst());
-            for (int i = 1; i < controls.size(); i++) {
-                Point current = controls.get(i);
-                segment.add(current);
-                if (i < controls.size() - 1 && same(current, controls.get(i + 1))) {
-                    addBezier(segment);
-                    segment = new ArrayList<>();
-                    segment.add(current);
-                    i++;
-                }
-            }
-            addBezier(segment);
-        }
-
-        private void addBezier(List<Point> controls) {
-            if (controls.isEmpty()) return;
-            if (controls.size() == 1) {
-                addPoint(controls.getFirst());
-                return;
-            }
-            double polygonLength = 0;
-            for (int i = 1; i < controls.size(); i++) {
-                polygonLength += distance(controls.get(i - 1), controls.get(i));
-            }
-            int samples = Math.clamp((int) Math.ceil(polygonLength / 0.25), 25, 10000);
-            for (int i = 0; i <= samples; i++) {
-                double t = (double) i / samples;
-                List<Point> work = new ArrayList<>(controls);
-                for (int level = work.size() - 1; level > 0; level--) {
-                    for (int p = 0; p < level; p++) {
-                        work.set(p, interpolate(work.get(p), work.get(p + 1), t));
-                    }
-                }
-                addPoint(work.getFirst());
-            }
-        }
-
-        private boolean addPerfectCurve(List<Point> controls) {
-            Point a = controls.get(0);
-            Point b = controls.get(1);
-            Point c = controls.get(2);
-            double determinant = 2 * (a.x() * (b.y() - c.y())
-                    + b.x() * (c.y() - a.y()) + c.x() * (a.y() - b.y()));
-            if (Math.abs(determinant) < 1e-7) return false;
-
-            double a2 = a.x() * a.x() + a.y() * a.y();
-            double b2 = b.x() * b.x() + b.y() * b.y();
-            double c2 = c.x() * c.x() + c.y() * c.y();
-            Point center = new Point(
-                    (a2 * (b.y() - c.y()) + b2 * (c.y() - a.y()) + c2 * (a.y() - b.y())) / determinant,
-                    (a2 * (c.x() - b.x()) + b2 * (a.x() - c.x()) + c2 * (b.x() - a.x())) / determinant);
-            double start = Math.atan2(a.y() - center.y(), a.x() - center.x());
-            double middle = Math.atan2(b.y() - center.y(), b.x() - center.x());
-            double end = Math.atan2(c.y() - center.y(), c.x() - center.x());
-            double sweep = positiveAngle(end - start);
-            if (positiveAngle(middle - start) > sweep) sweep -= Math.PI * 2;
-            double radius = distance(a, center);
-            int samples = Math.clamp((int) Math.ceil(Math.abs(sweep * radius) / 2), 25, 1000);
-            for (int i = 0; i <= samples; i++) {
-                double angle = start + sweep * i / samples;
-                addPoint(new Point(center.x() + Math.cos(angle) * radius,
-                        center.y() + Math.sin(angle) * radius));
-            }
-            return true;
-        }
-
-        private void addCatmull(List<Point> controls) {
-            if (controls.size() < 2) {
-                controls.forEach(this::addPoint);
-                return;
-            }
-            for (int i = 0; i < controls.size() - 1; i++) {
-                Point p0 = controls.get(Math.max(0, i - 1));
-                Point p1 = controls.get(i);
-                Point p2 = controls.get(i + 1);
-                Point p3 = controls.get(Math.min(controls.size() - 1, i + 2));
-                for (int sample = 0; sample <= 50; sample++) {
-                    double t = sample / 50.0;
-                    double t2 = t * t;
-                    double t3 = t2 * t;
-                    double x = 0.5 * ((2 * p1.x()) + (-p0.x() + p2.x()) * t
-                            + (2 * p0.x() - 5 * p1.x() + 4 * p2.x() - p3.x()) * t2
-                            + (-p0.x() + 3 * p1.x() - 3 * p2.x() + p3.x()) * t3);
-                    double y = 0.5 * ((2 * p1.y()) + (-p0.y() + p2.y()) * t
-                            + (2 * p0.y() - 5 * p1.y() + 4 * p2.y() - p3.y()) * t2
-                            + (-p0.y() + 3 * p1.y() - 3 * p2.y() + p3.y()) * t3);
-                    addPoint(new Point(x, y));
-                }
-            }
-        }
-
-        private void fitToExpectedLength() {
-            double currentLength = pathLength();
-            if (expectedLength <= currentLength || points.size() < 2) return;
-            int end = points.size() - 1;
-            while (end > 0 && same(points.get(end), points.get(end - 1))) end--;
-            if (end == 0) return;
-            Point previous = points.get(end - 1);
-            Point last = points.get(end);
-            double segmentLength = distance(previous, last);
-            if (segmentLength == 0) return;
-            double extension = expectedLength - currentLength;
-            addPoint(new Point(last.x() + (last.x() - previous.x()) / segmentLength * extension,
-                    last.y() + (last.y() - previous.y()) / segmentLength * extension));
-        }
-
-        private double pathLength() {
-            double length = 0;
-            for (int i = 1; i < points.size(); i++) length += distance(points.get(i - 1), points.get(i));
-            return length;
-        }
-
-        private void calculateLengths() {
-            cumulativeLength.clear();
-            cumulativeLength.add(0.0);
-            for (int i = 1; i < points.size(); i++) {
-                cumulativeLength.add(cumulativeLength.getLast() + distance(points.get(i - 1), points.get(i)));
-            }
-        }
-
-        private void addPoint(Point point) {
-            if (points.isEmpty() || !same(points.getLast(), point)) points.add(point);
-        }
-
-        private static Point interpolate(Point from, Point to, double weight) {
-            return new Point(from.x() + (to.x() - from.x()) * weight,
-                    from.y() + (to.y() - from.y()) * weight);
-        }
-
-        private static boolean same(Point a, Point b) {
-            return Math.abs(a.x() - b.x()) < 1e-7 && Math.abs(a.y() - b.y()) < 1e-7;
-        }
-
-        private static double distance(Point a, Point b) {
-            return Math.hypot(a.x() - b.x(), a.y() - b.y());
-        }
-
-        private static double positiveAngle(double angle) {
-            angle %= Math.PI * 2;
-            return angle < 0 ? angle + Math.PI * 2 : angle;
-        }
-    }
-
     public static double calculateUR(List<HitEvent> events, double clockRate) {
         List<Long> validOffsets = new LinkedList<>();
 
@@ -1221,6 +976,261 @@ public class ReplayAnalyzer {
         try (final RosuFFI.Beatmap rosuBeatmap = new RosuFFI.Beatmap(beatmap.toBeatmapString().getBytes());
              final RosuFFI.Mods rosuMods = RosuFFI.Mods.fromBits(modBits, RosuFFI.Mode.Osu)) {
             return calculatePp(rosuBeatmap, rosuMods, state, passedObjects);
+        }
+    }
+
+    private record SliderTiming(double beatLength, double velocityMultiplier) {
+    }
+
+    private record SliderNode(HitEvent.EventType type, double eventTime,
+                              double judgementTime, double pathProgress) {
+    }
+
+    private record SpinnerTracking(double rotations, List<SpinnerSpin> fullSpins) {
+    }
+
+    private record SpinnerSpin(long time, ReplaySample sample) {
+    }
+
+    private record ReplaySample(double x, double y, int keyFlags, int frameIndex) {
+    }
+
+    private record Point(double x, double y) {
+    }
+
+    private static final class SpinnerTracker {
+        private final HitObject spinner;
+        private final double clockRate;
+        private final boolean hardRock;
+        private final List<SpinnerSpin> fullSpins = new ArrayList<>();
+        private double accumulatedRotation;
+        private double accumulatedRotationAtLastCompletion;
+        private double currentSpinMaxRotation;
+
+        private SpinnerTracker(HitObject spinner, double clockRate, boolean hardRock) {
+            this.spinner = spinner;
+            this.clockRate = clockRate;
+            this.hardRock = hardRock;
+        }
+
+        private void track(long fromTime, ReplaySample from, long toTime, ReplaySample to) {
+            if ((to.keyFlags() & 15) == 0) return;
+
+            double delta = spinnerRotationBetween(spinner, from, to, hardRock) * clockRate;
+            if (delta == 0) return;
+
+            accumulatedRotation += delta;
+            double currentSpinRotation = accumulatedRotation - accumulatedRotationAtLastCompletion;
+            currentSpinMaxRotation = Math.max(currentSpinMaxRotation, Math.abs(currentSpinRotation));
+
+            while (currentSpinMaxRotation >= TWO_PI) {
+                int direction = currentSpinRotation < 0 ? -1 : 1;
+                fullSpins.add(new SpinnerSpin(toTime, to));
+                accumulatedRotationAtLastCompletion += direction * TWO_PI;
+                currentSpinRotation = accumulatedRotation - accumulatedRotationAtLastCompletion;
+                currentSpinMaxRotation = Math.abs(currentSpinRotation);
+            }
+        }
+
+        private SpinnerTracking result() {
+            return new SpinnerTracking(fullSpins.size() + currentSpinMaxRotation / TWO_PI,
+                    List.copyOf(fullSpins));
+        }
+    }
+
+    private static final class SliderPath {
+        private final List<Point> points = new ArrayList<>();
+        private final List<Double> cumulativeLength = new ArrayList<>();
+        private final double expectedLength;
+
+        private SliderPath(HitObject slider) {
+            this(slider, 0, false);
+        }
+
+        private SliderPath(HitObject slider, double stackOffset, boolean hardRock) {
+            expectedLength = Math.max(0, slider.getLength());
+            List<Point> controls = new ArrayList<>();
+            controls.add(new Point(slider.getX() - stackOffset,
+                    playfieldY(slider.getY(), hardRock) - stackOffset));
+            for (HitObject.ControlPoint point : slider.getControlPoints()) {
+                controls.add(new Point(point.x() - stackOffset,
+                        playfieldY(point.y(), hardRock) - stackOffset));
+            }
+
+            switch (slider.getCurveType() == null ? "L" : slider.getCurveType()) {
+                case "B" -> addBezierSegments(controls);
+                case "C" -> addCatmull(controls);
+                case "P" -> {
+                    if (controls.size() == 3 && !addPerfectCurve(controls)) addBezier(controls);
+                    else if (controls.size() != 3) addBezierSegments(controls);
+                }
+                default -> controls.forEach(this::addPoint);
+            }
+            if (points.isEmpty()) {
+                addPoint(new Point(slider.getX() - stackOffset,
+                        playfieldY(slider.getY(), hardRock) - stackOffset));
+            }
+            fitToExpectedLength();
+            calculateLengths();
+        }
+
+        private static Point interpolate(Point from, Point to, double weight) {
+            return new Point(from.x() + (to.x() - from.x()) * weight,
+                    from.y() + (to.y() - from.y()) * weight);
+        }
+
+        private static boolean same(Point a, Point b) {
+            return Math.abs(a.x() - b.x()) < 1e-7 && Math.abs(a.y() - b.y()) < 1e-7;
+        }
+
+        private static double distance(Point a, Point b) {
+            return Math.hypot(a.x() - b.x(), a.y() - b.y());
+        }
+
+        private static double positiveAngle(double angle) {
+            angle %= Math.PI * 2;
+            return angle < 0 ? angle + Math.PI * 2 : angle;
+        }
+
+        private Point positionAt(double progress) {
+            if (points.size() == 1 || expectedLength <= 0) return points.getFirst();
+            double target = Math.clamp(progress, 0, 1) * expectedLength;
+            int index = java.util.Collections.binarySearch(cumulativeLength, target);
+            if (index >= 0) return points.get(index);
+            index = -index - 1;
+            if (index <= 0) return points.getFirst();
+            if (index >= points.size()) return points.getLast();
+            double from = cumulativeLength.get(index - 1);
+            double to = cumulativeLength.get(index);
+            if (to <= from) return points.get(index - 1);
+            double weight = (target - from) / (to - from);
+            return interpolate(points.get(index - 1), points.get(index), weight);
+        }
+
+        private void addBezierSegments(List<Point> controls) {
+            List<Point> segment = new ArrayList<>();
+            segment.add(controls.getFirst());
+            for (int i = 1; i < controls.size(); i++) {
+                Point current = controls.get(i);
+                segment.add(current);
+                if (i < controls.size() - 1 && same(current, controls.get(i + 1))) {
+                    addBezier(segment);
+                    segment = new ArrayList<>();
+                    segment.add(current);
+                    i++;
+                }
+            }
+            addBezier(segment);
+        }
+
+        private void addBezier(List<Point> controls) {
+            if (controls.isEmpty()) return;
+            if (controls.size() == 1) {
+                addPoint(controls.getFirst());
+                return;
+            }
+            double polygonLength = 0;
+            for (int i = 1; i < controls.size(); i++) {
+                polygonLength += distance(controls.get(i - 1), controls.get(i));
+            }
+            int samples = Math.clamp((int) Math.ceil(polygonLength / 0.25), 25, 10000);
+            for (int i = 0; i <= samples; i++) {
+                double t = (double) i / samples;
+                List<Point> work = new ArrayList<>(controls);
+                for (int level = work.size() - 1; level > 0; level--) {
+                    for (int p = 0; p < level; p++) {
+                        work.set(p, interpolate(work.get(p), work.get(p + 1), t));
+                    }
+                }
+                addPoint(work.getFirst());
+            }
+        }
+
+        private boolean addPerfectCurve(List<Point> controls) {
+            Point a = controls.get(0);
+            Point b = controls.get(1);
+            Point c = controls.get(2);
+            double determinant = 2 * (a.x() * (b.y() - c.y())
+                    + b.x() * (c.y() - a.y()) + c.x() * (a.y() - b.y()));
+            if (Math.abs(determinant) < 1e-7) return false;
+
+            double a2 = a.x() * a.x() + a.y() * a.y();
+            double b2 = b.x() * b.x() + b.y() * b.y();
+            double c2 = c.x() * c.x() + c.y() * c.y();
+            Point center = new Point(
+                    (a2 * (b.y() - c.y()) + b2 * (c.y() - a.y()) + c2 * (a.y() - b.y())) / determinant,
+                    (a2 * (c.x() - b.x()) + b2 * (a.x() - c.x()) + c2 * (b.x() - a.x())) / determinant);
+            double start = Math.atan2(a.y() - center.y(), a.x() - center.x());
+            double middle = Math.atan2(b.y() - center.y(), b.x() - center.x());
+            double end = Math.atan2(c.y() - center.y(), c.x() - center.x());
+            double sweep = positiveAngle(end - start);
+            if (positiveAngle(middle - start) > sweep) sweep -= Math.PI * 2;
+            double radius = distance(a, center);
+            int samples = Math.clamp((int) Math.ceil(Math.abs(sweep * radius) / 2), 25, 1000);
+            for (int i = 0; i <= samples; i++) {
+                double angle = start + sweep * i / samples;
+                addPoint(new Point(center.x() + Math.cos(angle) * radius,
+                        center.y() + Math.sin(angle) * radius));
+            }
+            return true;
+        }
+
+        private void addCatmull(List<Point> controls) {
+            if (controls.size() < 2) {
+                controls.forEach(this::addPoint);
+                return;
+            }
+            for (int i = 0; i < controls.size() - 1; i++) {
+                Point p0 = controls.get(Math.max(0, i - 1));
+                Point p1 = controls.get(i);
+                Point p2 = controls.get(i + 1);
+                Point p3 = controls.get(Math.min(controls.size() - 1, i + 2));
+                for (int sample = 0; sample <= 50; sample++) {
+                    double t = sample / 50.0;
+                    double t2 = t * t;
+                    double t3 = t2 * t;
+                    double x = 0.5 * ((2 * p1.x()) + (-p0.x() + p2.x()) * t
+                            + (2 * p0.x() - 5 * p1.x() + 4 * p2.x() - p3.x()) * t2
+                            + (-p0.x() + 3 * p1.x() - 3 * p2.x() + p3.x()) * t3);
+                    double y = 0.5 * ((2 * p1.y()) + (-p0.y() + p2.y()) * t
+                            + (2 * p0.y() - 5 * p1.y() + 4 * p2.y() - p3.y()) * t2
+                            + (-p0.y() + 3 * p1.y() - 3 * p2.y() + p3.y()) * t3);
+                    addPoint(new Point(x, y));
+                }
+            }
+        }
+
+        private void fitToExpectedLength() {
+            double currentLength = pathLength();
+            if (expectedLength <= currentLength || points.size() < 2) return;
+            int end = points.size() - 1;
+            while (end > 0 && same(points.get(end), points.get(end - 1))) end--;
+            if (end == 0) return;
+            Point previous = points.get(end - 1);
+            Point last = points.get(end);
+            double segmentLength = distance(previous, last);
+            if (segmentLength == 0) return;
+            double extension = expectedLength - currentLength;
+            addPoint(new Point(last.x() + (last.x() - previous.x()) / segmentLength * extension,
+                    last.y() + (last.y() - previous.y()) / segmentLength * extension));
+        }
+
+        private double pathLength() {
+            double length = 0;
+            for (int i = 1; i < points.size(); i++) length += distance(points.get(i - 1), points.get(i));
+            return length;
+        }
+
+        private void calculateLengths() {
+            cumulativeLength.clear();
+            cumulativeLength.add(0.0);
+            for (int i = 1; i < points.size(); i++) {
+                cumulativeLength.add(cumulativeLength.getLast() + distance(points.get(i - 1), points.get(i)));
+            }
+        }
+
+        private void addPoint(Point point) {
+            if (points.isEmpty() || !same(points.getLast(), point)) points.add(point);
         }
     }
 }
