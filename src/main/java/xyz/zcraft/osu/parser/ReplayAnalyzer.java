@@ -234,7 +234,8 @@ public class ReplayAnalyzer {
         for (HitEvent event : events) {
             if (!event.wasHit()
                     || !event.isObjectStart()
-                    || event.eventType() == HitEvent.EventType.SPINNER) {
+                    || event.eventType() == HitEvent.EventType.SPINNER
+                    || event.aimBias() == null) {
                 continue;
             }
 
