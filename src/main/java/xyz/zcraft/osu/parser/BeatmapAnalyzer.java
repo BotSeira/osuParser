@@ -14,7 +14,10 @@ import xyz.zcraft.osu.parser.data.beatmap.WindowDifficulty;
 import xyz.zcraft.osu.parser.exception.AnalyzeException;
 
 import java.time.Duration;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import static xyz.zcraft.osu.parser.OsuParser.getModBits;
 
@@ -115,7 +118,7 @@ public class BeatmapAnalyzer {
         double ar = beatmap.getAr();
         double hp = beatmap.getDrain();
 
-        return calculateDifficulty(cs, od ,ar, hp, mods);
+        return calculateDifficulty(cs, od, ar, hp, mods);
     }
 
     public static @NotNull DifficultyAttribute calculateDifficulty(double cs, double od, double ar, double hp, long mods) {

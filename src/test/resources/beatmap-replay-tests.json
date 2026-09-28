@@ -127,7 +127,10 @@
         "maxCombo": 771,
         "accuracy": 0.8954,
         "pp": 96,
-        "mods": ["HR", "HD"],
+        "mods": [
+          "HR",
+          "HD"
+        ],
         "hitResults": {
           "perfect": 591,
           "ok": 131,
@@ -151,7 +154,9 @@
         "maxCombo": 760,
         "accuracy": 0.9696,
         "pp": 201,
-        "mods": ["HR"],
+        "mods": [
+          "HR"
+        ],
         "hitResults": {
           "perfect": 842,
           "ok": 46,

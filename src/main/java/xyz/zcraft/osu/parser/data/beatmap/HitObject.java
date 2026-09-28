@@ -7,18 +7,16 @@ import java.util.List;
 
 @Data
 public class HitObject {
+    public int endTime;
     private int x, y, typeFlag, hitSoundFlag;
     private long time;
     private boolean isNewCombo;
     private ObjectType objectType;
     private String rawData;
-
     private String curveType;
     private List<ControlPoint> controlPoints = new ArrayList<>();
     private int slides = 1;
     private double length = 0.0;
-
-    public int endTime;
 
     @Override
     public String toString() {
@@ -29,5 +27,6 @@ public class HitObject {
         HIT_CIRCLE, SLIDER, SPINNER
     }
 
-    public record ControlPoint(double x, double y){}
+    public record ControlPoint(double x, double y) {
+    }
 }

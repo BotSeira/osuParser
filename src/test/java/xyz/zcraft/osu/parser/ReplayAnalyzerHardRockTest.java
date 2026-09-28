@@ -12,12 +12,40 @@ import xyz.zcraft.osu.parser.exception.ParseException;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 class ReplayAnalyzerHardRockTest {
     private static final int HARD_ROCK = 16;
+
+    private static OsuBeatmap beatmap(String hash) {
+        OsuBeatmap beatmap = new OsuBeatmap();
+        beatmap.setHash(hash);
+        beatmap.setCs(5.0);
+        beatmap.setOd(5.0);
+        beatmap.setAr(5.0);
+        beatmap.setHp(5.0);
+        return beatmap;
+    }
+
+    private static HitObject circle(int x, int y, int time) {
+        HitObject circle = new HitObject();
+        circle.setX(x);
+        circle.setY(y);
+        circle.setTime(time);
+        circle.setObjectType(HitObject.ObjectType.HIT_CIRCLE);
+        return circle;
+    }
+
+    private static OsuReplay replay(String hash, int mods, ReplayInfo replayInfo,
+                                    List<OsuReplay.TimedKeyFrame> frames) {
+        return new OsuReplay((byte) 0, 30000001, hash, "player", "replay",
+                (short) 0, (short) 0, (short) 0, (short) 0, (short) 0, (short) 0,
+                0, (short) 0, false, mods, "", 0, frames, 0, replayInfo);
+    }
+
+    private static OsuReplay.TimedKeyFrame frame(long time, double x, double y, int key) {
+        return new OsuReplay.TimedKeyFrame(time, 0, (float) x, (float) y, key);
+    }
 
     @Test
     void mirrorsCirclePositionsAndApproachDirection() throws Exception {
@@ -126,35 +154,5 @@ class ReplayAnalyzerHardRockTest {
 
         assertThrows(ParseException.class, () -> ReplayAnalyzer.analyze(null, replay));
         assertThrows(ParseException.class, () -> ReplayAnalyzer.analyze(beatmap, null));
-    }
-
-    private static OsuBeatmap beatmap(String hash) {
-        OsuBeatmap beatmap = new OsuBeatmap();
-        beatmap.setHash(hash);
-        beatmap.setCs(5.0);
-        beatmap.setOd(5.0);
-        beatmap.setAr(5.0);
-        beatmap.setHp(5.0);
-        return beatmap;
-    }
-
-    private static HitObject circle(int x, int y, int time) {
-        HitObject circle = new HitObject();
-        circle.setX(x);
-        circle.setY(y);
-        circle.setTime(time);
-        circle.setObjectType(HitObject.ObjectType.HIT_CIRCLE);
-        return circle;
-    }
-
-    private static OsuReplay replay(String hash, int mods, ReplayInfo replayInfo,
-                                    List<OsuReplay.TimedKeyFrame> frames) {
-        return new OsuReplay((byte) 0, 30000001, hash, "player", "replay",
-                (short) 0, (short) 0, (short) 0, (short) 0, (short) 0, (short) 0,
-                0, (short) 0, false, mods, "", 0, frames, 0, replayInfo);
-    }
-
-    private static OsuReplay.TimedKeyFrame frame(long time, double x, double y, int key) {
-        return new OsuReplay.TimedKeyFrame(time, 0, (float) x, (float) y, key);
     }
 }

@@ -93,7 +93,7 @@ public class OsuBeatmap {
         storyBoardLayer2 = new LinkedList<>();
         storyBoardLayer3 = new LinkedList<>();
         storyBoardLayer4 = new LinkedList<>();
-        audioSampleEvents =  new LinkedList<>();
+        audioSampleEvents = new LinkedList<>();
     }
 
     private static void append(StringBuilder sb, String key, Object val) {
@@ -124,7 +124,7 @@ public class OsuBeatmap {
         sb.append("\n");
 
         sb.append("[Editor]").append("\n");
-        append(sb, "Bookmarks", bookmarks.stream().map(String::valueOf).reduce((a,b)->a + "," + b).orElse(null));
+        append(sb, "Bookmarks", bookmarks.stream().map(String::valueOf).reduce((a, b) -> a + "," + b).orElse(null));
         append(sb, "DistanceSpacing", distanceSpacing);
         append(sb, "BeatDivisor", beatDivisor);
         append(sb, "GridSize", gridSize);

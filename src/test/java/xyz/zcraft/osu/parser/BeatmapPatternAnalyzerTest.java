@@ -12,13 +12,33 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static xyz.zcraft.osu.parser.data.beatmap.BeatmapPatternAnalysis.AimPatternType.CROSS_SCREEN_JUMP_AIM;
-import static xyz.zcraft.osu.parser.data.beatmap.BeatmapPatternAnalysis.PatternType.AIM;
-import static xyz.zcraft.osu.parser.data.beatmap.BeatmapPatternAnalysis.PatternType.ALT;
-import static xyz.zcraft.osu.parser.data.beatmap.BeatmapPatternAnalysis.PatternType.READING;
-import static xyz.zcraft.osu.parser.data.beatmap.BeatmapPatternAnalysis.PatternType.STREAM;
+import static xyz.zcraft.osu.parser.data.beatmap.BeatmapPatternAnalysis.PatternType.*;
 
 class BeatmapPatternAnalyzerTest {
     private static final DifficultyAttribute NORMAL = new DifficultyAttribute(4, 8, 9, 6, 8, 1);
+
+    private static OsuBeatmap map(double ar) {
+        OsuBeatmap map = new OsuBeatmap();
+        map.setCs(4.0);
+        map.setAr(ar);
+        map.setOd(8.0);
+        map.setHp(6.0);
+        map.setTimingPoints(List.of(new OsuBeatmap.TimingPoint(0, 500, 4, 1, 0, 100, 1, 0)));
+        return map;
+    }
+
+    private static HitObject circle(long time, int x, int y) {
+        HitObject object = new HitObject();
+        object.setTime(time);
+        object.setX(x);
+        object.setY(y);
+        object.setObjectType(HitObject.ObjectType.HIT_CIRCLE);
+        return object;
+    }
+
+    private static void assertNormalized(double total) {
+        assertEquals(100.0, total, 0.000_001);
+    }
 
     @Test
     void identifiesLongQuarterBeatCircleRunsAsStream() {
@@ -94,28 +114,5 @@ class BeatmapPatternAnalyzerTest {
         assertNormalized(analysis.types().stream().mapToDouble(BeatmapPatternAnalysis.PatternScore::percentage).sum());
         assertNormalized(analysis.aimTypes().stream()
                 .mapToDouble(BeatmapPatternAnalysis.AimPatternScore::percentage).sum());
-    }
-
-    private static OsuBeatmap map(double ar) {
-        OsuBeatmap map = new OsuBeatmap();
-        map.setCs(4.0);
-        map.setAr(ar);
-        map.setOd(8.0);
-        map.setHp(6.0);
-        map.setTimingPoints(List.of(new OsuBeatmap.TimingPoint(0, 500, 4, 1, 0, 100, 1, 0)));
-        return map;
-    }
-
-    private static HitObject circle(long time, int x, int y) {
-        HitObject object = new HitObject();
-        object.setTime(time);
-        object.setX(x);
-        object.setY(y);
-        object.setObjectType(HitObject.ObjectType.HIT_CIRCLE);
-        return object;
-    }
-
-    private static void assertNormalized(double total) {
-        assertEquals(100.0, total, 0.000_001);
     }
 }

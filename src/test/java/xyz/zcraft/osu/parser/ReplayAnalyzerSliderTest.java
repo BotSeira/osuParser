@@ -13,6 +13,40 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ReplayAnalyzerSliderTest {
+    private static OsuBeatmap beatmapWithLinearSlider() {
+        OsuBeatmap beatmap = new OsuBeatmap();
+        beatmap.setHash("slider-test");
+        beatmap.setCs(5.0);
+        beatmap.setOd(5.0);
+        beatmap.setAr(5.0);
+        beatmap.setHp(5.0);
+        beatmap.setSliderMultiplier(1.0);
+        beatmap.setSliderTickRate(1.0);
+        beatmap.getTimingPoints().add(new OsuBeatmap.TimingPoint(0, 1000, 4, 0, 0, 100, 1, 0));
+
+        HitObject slider = new HitObject();
+        slider.setX(100);
+        slider.setY(100);
+        slider.setTime(1000);
+        slider.setObjectType(HitObject.ObjectType.SLIDER);
+        slider.setCurveType("L");
+        slider.getControlPoints().add(new HitObject.ControlPoint(300, 100));
+        slider.setSlides(1);
+        slider.setLength(200);
+        beatmap.getHitObjects().add(slider);
+        return beatmap;
+    }
+
+    private static OsuReplay replay(String hash, List<OsuReplay.TimedKeyFrame> frames) {
+        return new OsuReplay((byte) 0, 0, hash, "player", "replay", (short) 1,
+                (short) 0, (short) 0, (short) 0, (short) 0, (short) 0,
+                300, (short) 1, true, 0, "", 0, frames, 0, null);
+    }
+
+    private static OsuReplay.TimedKeyFrame frame(long time, float x, float y, int key) {
+        return new OsuReplay.TimedKeyFrame(time, 0, x, y, key);
+    }
+
     @Test
     void emitsHitEventsForSliderTicksAndEnd() throws Exception {
         OsuBeatmap beatmap = beatmapWithLinearSlider();
@@ -87,39 +121,5 @@ class ReplayAnalyzerSliderTest {
         assertEquals(List.of(1000L, 1500L, 2000L, 2500L, 3000L),
                 events.stream().map(HitEvent::eventTime).toList());
         assertTrue(events.stream().allMatch(HitEvent::wasHit));
-    }
-
-    private static OsuBeatmap beatmapWithLinearSlider() {
-        OsuBeatmap beatmap = new OsuBeatmap();
-        beatmap.setHash("slider-test");
-        beatmap.setCs(5.0);
-        beatmap.setOd(5.0);
-        beatmap.setAr(5.0);
-        beatmap.setHp(5.0);
-        beatmap.setSliderMultiplier(1.0);
-        beatmap.setSliderTickRate(1.0);
-        beatmap.getTimingPoints().add(new OsuBeatmap.TimingPoint(0, 1000, 4, 0, 0, 100, 1, 0));
-
-        HitObject slider = new HitObject();
-        slider.setX(100);
-        slider.setY(100);
-        slider.setTime(1000);
-        slider.setObjectType(HitObject.ObjectType.SLIDER);
-        slider.setCurveType("L");
-        slider.getControlPoints().add(new HitObject.ControlPoint(300, 100));
-        slider.setSlides(1);
-        slider.setLength(200);
-        beatmap.getHitObjects().add(slider);
-        return beatmap;
-    }
-
-    private static OsuReplay replay(String hash, List<OsuReplay.TimedKeyFrame> frames) {
-        return new OsuReplay((byte) 0, 0, hash, "player", "replay", (short) 1,
-                (short) 0, (short) 0, (short) 0, (short) 0, (short) 0,
-                300, (short) 1, true, 0, "", 0, frames, 0, null);
-    }
-
-    private static OsuReplay.TimedKeyFrame frame(long time, float x, float y, int key) {
-        return new OsuReplay.TimedKeyFrame(time, 0, x, y, key);
     }
 }

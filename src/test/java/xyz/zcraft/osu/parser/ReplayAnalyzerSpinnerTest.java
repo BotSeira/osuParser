@@ -10,13 +10,69 @@ import xyz.zcraft.osu.parser.data.replay.ReplayAnalyze;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 class ReplayAnalyzerSpinnerTest {
     private static final long START_TIME = 1000;
     private static final long END_TIME = 3200;
+
+    private static void assertSpinnerResult(double rotations, HitEvent.HitResult expected) throws Exception {
+        ReplayAnalyze analyze = ReplayAnalyzer.analyze(beatmap(), replay(spinFrames(rotations, 1), 0));
+
+        HitEvent spinner = spinnerJudgement(analyze);
+        assertEquals(HitEvent.EventType.SPINNER, spinner.eventType());
+        assertEquals(START_TIME, spinner.eventTime());
+        assertEquals(END_TIME, spinner.hitTime());
+        assertEquals(expected, spinner.hitResult());
+        assertEquals(expected != HitEvent.HitResult.MISS, spinner.wasHit());
+    }
+
+    private static HitEvent spinnerJudgement(ReplayAnalyze analyze) {
+        return analyze.events().stream()
+                .filter(event -> event.eventType() == HitEvent.EventType.SPINNER)
+                .findFirst()
+                .orElseThrow();
+    }
+
+    private static OsuBeatmap beatmap() {
+        OsuBeatmap beatmap = new OsuBeatmap();
+        beatmap.setHash("spinner-test");
+        beatmap.setCs(5.0);
+        beatmap.setOd(5.0);
+        beatmap.setAr(5.0);
+        beatmap.setHp(5.0);
+
+        HitObject spinner = new HitObject();
+        spinner.setX(256);
+        spinner.setY(192);
+        spinner.setTime(START_TIME);
+        spinner.setEndTime((int) END_TIME);
+        spinner.setObjectType(HitObject.ObjectType.SPINNER);
+        beatmap.getHitObjects().add(spinner);
+        return beatmap;
+    }
+
+    private static OsuReplay replay(List<OsuReplay.TimedKeyFrame> frames, int mods) {
+        return new OsuReplay((byte) 0, 20250701, "spinner-test", "player", "replay",
+                (short) 0, (short) 0, (short) 0, (short) 0, (short) 0, (short) 0,
+                0, (short) 0, false, mods, "", 0, frames, 0, null);
+    }
+
+    private static List<OsuReplay.TimedKeyFrame> spinFrames(double rotations, int key) {
+        int steps = Math.max(1, (int) Math.ceil(rotations * 16));
+        List<OsuReplay.TimedKeyFrame> frames = new ArrayList<>(steps + 1);
+        for (int i = 0; i <= steps; i++) {
+            double progress = (double) i / steps;
+            double angle = rotations * Math.PI * 2 * progress;
+            long time = START_TIME + Math.round((END_TIME - START_TIME) * progress);
+            frames.add(frame(time, 256 + 100 * Math.cos(angle), 192 + 100 * Math.sin(angle), key));
+        }
+        return frames;
+    }
+
+    private static OsuReplay.TimedKeyFrame frame(long time, double x, double y, int key) {
+        return new OsuReplay.TimedKeyFrame(time, 0, (float) x, (float) y, key);
+    }
 
     @Test
     void countsSpinsAndBonusesInRecordedReplay() throws Exception {
@@ -114,63 +170,5 @@ class ReplayAnalyzerSpinnerTest {
         assertEquals(7, spins.size());
         assertEquals(1, spins.stream().filter(HitEvent::wasHit).count());
         assertEquals(6, spins.stream().filter(event -> !event.wasHit()).count());
-    }
-
-    private static void assertSpinnerResult(double rotations, HitEvent.HitResult expected) throws Exception {
-        ReplayAnalyze analyze = ReplayAnalyzer.analyze(beatmap(), replay(spinFrames(rotations, 1), 0));
-
-        HitEvent spinner = spinnerJudgement(analyze);
-        assertEquals(HitEvent.EventType.SPINNER, spinner.eventType());
-        assertEquals(START_TIME, spinner.eventTime());
-        assertEquals(END_TIME, spinner.hitTime());
-        assertEquals(expected, spinner.hitResult());
-        assertEquals(expected != HitEvent.HitResult.MISS, spinner.wasHit());
-    }
-
-    private static HitEvent spinnerJudgement(ReplayAnalyze analyze) {
-        return analyze.events().stream()
-                .filter(event -> event.eventType() == HitEvent.EventType.SPINNER)
-                .findFirst()
-                .orElseThrow();
-    }
-
-    private static OsuBeatmap beatmap() {
-        OsuBeatmap beatmap = new OsuBeatmap();
-        beatmap.setHash("spinner-test");
-        beatmap.setCs(5.0);
-        beatmap.setOd(5.0);
-        beatmap.setAr(5.0);
-        beatmap.setHp(5.0);
-
-        HitObject spinner = new HitObject();
-        spinner.setX(256);
-        spinner.setY(192);
-        spinner.setTime(START_TIME);
-        spinner.setEndTime((int) END_TIME);
-        spinner.setObjectType(HitObject.ObjectType.SPINNER);
-        beatmap.getHitObjects().add(spinner);
-        return beatmap;
-    }
-
-    private static OsuReplay replay(List<OsuReplay.TimedKeyFrame> frames, int mods) {
-        return new OsuReplay((byte) 0, 20250701, "spinner-test", "player", "replay",
-                (short) 0, (short) 0, (short) 0, (short) 0, (short) 0, (short) 0,
-                0, (short) 0, false, mods, "", 0, frames, 0, null);
-    }
-
-    private static List<OsuReplay.TimedKeyFrame> spinFrames(double rotations, int key) {
-        int steps = Math.max(1, (int) Math.ceil(rotations * 16));
-        List<OsuReplay.TimedKeyFrame> frames = new ArrayList<>(steps + 1);
-        for (int i = 0; i <= steps; i++) {
-            double progress = (double) i / steps;
-            double angle = rotations * Math.PI * 2 * progress;
-            long time = START_TIME + Math.round((END_TIME - START_TIME) * progress);
-            frames.add(frame(time, 256 + 100 * Math.cos(angle), 192 + 100 * Math.sin(angle), key));
-        }
-        return frames;
-    }
-
-    private static OsuReplay.TimedKeyFrame frame(long time, double x, double y, int key) {
-        return new OsuReplay.TimedKeyFrame(time, 0, (float) x, (float) y, key);
     }
 }

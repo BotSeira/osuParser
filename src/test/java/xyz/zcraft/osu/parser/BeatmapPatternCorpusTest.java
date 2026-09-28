@@ -11,42 +11,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.assertAll;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static xyz.zcraft.osu.parser.data.beatmap.BeatmapPatternAnalysis.AimPatternType.AWKWARD_AIM;
-import static xyz.zcraft.osu.parser.data.beatmap.BeatmapPatternAnalysis.AimPatternType.CROSS_SCREEN_JUMP_AIM;
-import static xyz.zcraft.osu.parser.data.beatmap.BeatmapPatternAnalysis.AimPatternType.WIDE_ANGLE_JUMP_AIM;
+import static org.junit.jupiter.api.Assertions.*;
+import static xyz.zcraft.osu.parser.data.beatmap.BeatmapPatternAnalysis.AimPatternType.*;
 import static xyz.zcraft.osu.parser.data.beatmap.BeatmapPatternAnalysis.PatternType;
 
 class BeatmapPatternCorpusTest {
     private static final Path CORPUS = Path.of("src/test/resources/beatmaps/classification");
-
-    @Test
-    void classifiesCuratedRealBeatmapCorpus() {
-        List<Executable> checks = new ArrayList<>();
-        for (Map.Entry<String, PatternType> entry : expectedTypes().entrySet()) {
-            checks.add(() -> {
-                BeatmapPatternAnalysis analysis = analyze(entry.getKey());
-                assertEquals(entry.getValue(), analysis.primaryType().type(), entry.getKey());
-                assertEquals(100.0, analysis.types().stream()
-                        .mapToDouble(BeatmapPatternAnalysis.PatternScore::percentage).sum(), 0.000_001);
-                assertTrue(analysis.types().stream()
-                        .allMatch(score -> Double.isFinite(score.percentage()) && score.percentage() >= 0));
-            });
-        }
-        assertAll(checks);
-    }
-
-    @Test
-    void exposesAnnotatedAimCharacteristics() throws Exception {
-        assertEquals(CROSS_SCREEN_JUMP_AIM, analyze("129847").primaryAimType().type(),
-                "square and cross-screen jump map");
-        assertEquals(AWKWARD_AIM, analyze("2697301").primaryAimType().type(),
-                "awkward aim map");
-        assertTrue(aimPercentage("4130854", WIDE_ANGLE_JUMP_AIM) > 3,
-                "wide-angle jump map");
-    }
 
     private static BeatmapPatternAnalysis analyze(String id) throws Exception {
         OsuBeatmap map = BeatmapParser.parseBeatmap(CORPUS.resolve(id + ".osu"));
@@ -78,5 +48,31 @@ class BeatmapPatternCorpusTest {
 
     private static void add(Map<String, PatternType> target, PatternType type, String... ids) {
         for (String id : ids) target.put(id, type);
+    }
+
+    @Test
+    void classifiesCuratedRealBeatmapCorpus() {
+        List<Executable> checks = new ArrayList<>();
+        for (Map.Entry<String, PatternType> entry : expectedTypes().entrySet()) {
+            checks.add(() -> {
+                BeatmapPatternAnalysis analysis = analyze(entry.getKey());
+                assertEquals(entry.getValue(), analysis.primaryType().type(), entry.getKey());
+                assertEquals(100.0, analysis.types().stream()
+                        .mapToDouble(BeatmapPatternAnalysis.PatternScore::percentage).sum(), 0.000_001);
+                assertTrue(analysis.types().stream()
+                        .allMatch(score -> Double.isFinite(score.percentage()) && score.percentage() >= 0));
+            });
+        }
+        assertAll(checks);
+    }
+
+    @Test
+    void exposesAnnotatedAimCharacteristics() throws Exception {
+        assertEquals(CROSS_SCREEN_JUMP_AIM, analyze("129847").primaryAimType().type(),
+                "square and cross-screen jump map");
+        assertEquals(AWKWARD_AIM, analyze("2697301").primaryAimType().type(),
+                "awkward aim map");
+        assertTrue(aimPercentage("4130854", WIDE_ANGLE_JUMP_AIM) > 3,
+                "wide-angle jump map");
     }
 }
