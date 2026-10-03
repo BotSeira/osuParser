@@ -44,7 +44,10 @@ public class ReplayAnalyzer {
         final DifficultyAttribute diff = BeatmapAnalyzer.calculateDifficulty(beatmap, mods);
 
         final double circleRadius = diff.getCircleRadiusInPixel();
-        int[] stackHeights = calculateStackHeights(beatmap, diff.ar());
+        // Frame and object timestamps share the beatmap clock, not wall-clock playback time.
+        double mapPreempt = (diff.ar() < 5 ? 1800 - diff.ar() * 120 : 1200 - (diff.ar() - 5) * 150) * diff.clockRate();
+        double mapAr = mapPreempt < 1200 ? 5 + (1200 - mapPreempt) / 150 : (1800 - mapPreempt) / 120;
+        int[] stackHeights = calculateStackHeights(beatmap, mapAr);
         double stackOffsetUnit = (1 - 0.7 * (diff.cs() - 5) / 5) / 2 * 6.4;
 
         AtomicInteger keyFrameIndex = new AtomicInteger(0);
@@ -76,7 +79,7 @@ public class ReplayAnalyzer {
             }
 
             long objectStart = hitObject.getTime();
-            double mehWindow = Math.floor(diff.getMehWindow());
+            double mehWindow = Math.floor(diff.getMehWindow() * diff.clockRate());
             double hitWindowStart = objectStart - mehWindow;
             double searchTo = objectStart + mehWindow;
 
@@ -163,11 +166,11 @@ public class ReplayAnalyzer {
             if (wasHit) {
                 keyFrameIndex.set(foundFrameIndex);
 
-                if (Math.abs(offset) < Math.floor(diff.getPerfectWindow())) {
+                if (Math.abs(offset) < Math.floor(diff.getPerfectWindow() * diff.clockRate())) {
                     hitResult = HitEvent.HitResult.PERFECT;
-                } else if (Math.abs(offset) < Math.floor(diff.getOkWindow())) {
+                } else if (Math.abs(offset) < Math.floor(diff.getOkWindow() * diff.clockRate())) {
                     hitResult = HitEvent.HitResult.OK;
-                } else if (Math.abs(offset) < Math.floor(diff.getMehWindow())) {
+                } else if (Math.abs(offset) < Math.floor(diff.getMehWindow() * diff.clockRate())) {
                     hitResult = HitEvent.HitResult.MEH;
                 }
             } else {
@@ -712,7 +715,13 @@ public class ReplayAnalyzer {
         return new SliderTiming(beatLength, velocityMultiplier);
     }
 
-    private static double sliderProgress(HitObject slider, double duration, double time) {
+    /** Duration in the beatmap/replay clock, including all repeats and inherited SV. */
+    public static double sliderDuration(OsuBeatmap beatmap, HitObject slider) {
+        return sliderNodes(beatmap, slider).stream().mapToDouble(SliderNode::eventTime).max()
+                .orElse(slider.getTime()) - slider.getTime();
+    }
+
+    public static double sliderProgress(HitObject slider, double duration, double time) {
         if (duration <= 0) return 0;
         int spans = Math.max(1, slider.getSlides());
         double spanPosition = Math.clamp((time - slider.getTime()) / duration, 0, 1) * spans;
@@ -767,7 +776,7 @@ public class ReplayAnalyzer {
         return replay != null && (effectiveLegacyMods(replay) & HARD_ROCK_MOD) != 0;
     }
 
-    private static int effectiveLegacyMods(OsuReplay replay) {
+    public static int effectiveLegacyMods(OsuReplay replay) {
         int mods = replay.mods();
         if (replay.replayInfo() == null || replay.replayInfo().mods() == null) return mods;
 
@@ -830,7 +839,7 @@ public class ReplayAnalyzer {
         return standardDeviation * 10.0 / clockRate; // cv. UR
     }
 
-    private static int[] calculateStackHeights(OsuBeatmap beatmap, double ar) {
+    public static int[] calculateStackHeights(OsuBeatmap beatmap, double ar) {
         List<HitObject> hitObjects = beatmap.getHitObjects();
         int[] heights = new int[hitObjects.size()];
         if (hitObjects.isEmpty()) return heights;
@@ -933,7 +942,7 @@ public class ReplayAnalyzer {
     private static HitEvent.HitResult windowAccuracyResult(HitEvent event, DifficultyAttribute difficulty) {
         if (!event.wasHit() || event.eventType() == HitEvent.EventType.SPINNER) return event.hitResult();
 
-        long absoluteOffset = Math.abs(event.hitTimeOffset());
+        double absoluteOffset = Math.abs(event.hitTimeOffset()) / difficulty.clockRate();
         if (absoluteOffset <= difficulty.getPerfectWindow()) return HitEvent.HitResult.PERFECT;
         if (absoluteOffset <= difficulty.getOkWindow()) return HitEvent.HitResult.OK;
         if (absoluteOffset <= difficulty.getMehWindow()) return HitEvent.HitResult.MEH;
@@ -996,7 +1005,7 @@ public class ReplayAnalyzer {
     private record ReplaySample(double x, double y, int keyFlags, int frameIndex) {
     }
 
-    private record Point(double x, double y) {
+    public record Point(double x, double y) {
     }
 
     private static final class SpinnerTracker {
@@ -1039,16 +1048,17 @@ public class ReplayAnalyzer {
         }
     }
 
-    private static final class SliderPath {
+    /** Shared arc-length geometry for replay judging and full playfield rendering. */
+    public static final class SliderPath {
         private final List<Point> points = new ArrayList<>();
         private final List<Double> cumulativeLength = new ArrayList<>();
         private final double expectedLength;
 
-        private SliderPath(HitObject slider) {
+        public SliderPath(HitObject slider) {
             this(slider, 0, false);
         }
 
-        private SliderPath(HitObject slider, double stackOffset, boolean hardRock) {
+        public SliderPath(HitObject slider, double stackOffset, boolean hardRock) {
             expectedLength = Math.max(0, slider.getLength());
             List<Point> controls = new ArrayList<>();
             controls.add(new Point(slider.getX() - stackOffset,
@@ -1093,7 +1103,7 @@ public class ReplayAnalyzer {
             return angle < 0 ? angle + Math.PI * 2 : angle;
         }
 
-        private Point positionAt(double progress) {
+        public Point positionAt(double progress) {
             if (points.size() == 1 || expectedLength <= 0) return points.getFirst();
             double target = Math.clamp(progress, 0, 1) * expectedLength;
             int index = java.util.Collections.binarySearch(cumulativeLength, target);

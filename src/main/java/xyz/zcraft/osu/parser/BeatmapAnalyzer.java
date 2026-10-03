@@ -122,25 +122,26 @@ public class BeatmapAnalyzer {
     }
 
     public static @NotNull DifficultyAttribute calculateDifficulty(double cs, double od, double ar, double hp, long mods) {
-        final double originalOd = od;
-
         boolean hasEZ = (mods & 2) > 0;
         boolean hasHR = (mods & 16) > 0;
         boolean hasDT = (mods & 64) > 0;
         boolean hasHT = (mods & 256) > 0;
         boolean hasNC = (mods & 512) > 0;
 
-        double approachTime = ar >= 5 ? (1200 - 150 * (ar - 5)) : (1800 - 120 * ar);
-
         if (hasHR) {
             cs = Math.min(10.0, cs * 1.3);
             od = Math.min(10.0, od * 1.4);
+            ar = Math.min(10.0, ar * 1.4);
             hp = Math.min(10.0, hp * 1.4);
         } else if (hasEZ) {
             cs = cs * 0.5;
             od = od * 0.5;
+            ar = ar * 0.5;
             hp = hp * 0.5;
         }
+
+        final double originalOd = od;
+        double approachTime = ar >= 5 ? (1200 - 150 * (ar - 5)) : (1800 - 120 * ar);
 
         double clockRate = 1.0;
         if (hasDT || hasNC) {
