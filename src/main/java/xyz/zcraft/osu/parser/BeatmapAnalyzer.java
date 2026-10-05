@@ -1,5 +1,7 @@
 package xyz.zcraft.osu.parser;
 
+import xyz.zcraft.osu.model.ModSettings;
+
 import desu.life.RosuFFI;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
@@ -19,10 +21,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static xyz.zcraft.osu.parser.OsuParser.getModBits;
 
 public class BeatmapAnalyzer {
     public static List<WindowDifficulty> getWindowDifficulties(OsuBeatmap osuBeatmap, Duration window) throws AnalyzeException {
+        return getWindowDifficulties(osuBeatmap, window, List.of());
+    }
+
+    public static List<WindowDifficulty> getWindowDifficulties(OsuBeatmap osuBeatmap, Duration window, List<Mod> mods) throws AnalyzeException {
         List<Long> timestamps = extractTimestamps(osuBeatmap);
         if (timestamps.isEmpty()) {
             throw new AnalyzeException("No hit objects found in the beatmap.");
@@ -41,7 +46,7 @@ public class BeatmapAnalyzer {
             }
 
             try {
-                var windowDiff = calculateWindowDifficulty(osuBeatmap, start, end);
+                var windowDiff = calculateWindowDifficulty(osuBeatmap, start, end, mods);
                 final Double windowStar = windowDiff.getKey();
                 final Double windowPp = windowDiff.getValue();
 
@@ -60,13 +65,20 @@ public class BeatmapAnalyzer {
      * @return Pair of window's star rating and PP
      */
     public static Pair<Double, Double> calculateWindowDifficulty(OsuBeatmap osuBeatmap, long startTimeMs, long endTimeMs) {
+        return calculateWindowDifficulty(osuBeatmap, startTimeMs, endTimeMs, List.of());
+    }
+
+    public static Pair<Double, Double> calculateWindowDifficulty(OsuBeatmap osuBeatmap, long startTimeMs, long endTimeMs, List<Mod> mods) {
         try {
             final String str = osuBeatmap.toWindowedBeatmapString(startTimeMs, endTimeMs);
             try (
                     desu.life.RosuFFI.Beatmap beatmap = new desu.life.RosuFFI.Beatmap(str.getBytes());
                     desu.life.RosuFFI.Difficulty diff = new desu.life.RosuFFI.Difficulty();
-                    desu.life.RosuFFI.Performance performance = new RosuFFI.Performance()
+                    desu.life.RosuFFI.Performance performance = new RosuFFI.Performance();
+                    RosuFFI.Mods rosuMods = OsuParser.toRosuMods(mods)
             ) {
+                diff.mods(rosuMods);
+                performance.mods(rosuMods);
                 final double stars = diff.calculate(beatmap).asOsu().stars;
                 final double pp = performance.calculate(beatmap).asOsu().pp;
 
@@ -88,19 +100,11 @@ public class BeatmapAnalyzer {
     }
 
     public static @NotNull DifficultyAttribute calculateDifficulty(OsuBeatmap beatmap, List<Mod> mods) {
-        int modBits = 0;
-        for (Mod mod : mods) {
-            modBits |= getModBits(mod);
-        }
-        return calculateDifficulty(beatmap, modBits);
+        return calculateDifficulty(beatmap.getCs(), beatmap.getOd(), beatmap.getAr(), beatmap.getHp(), mods);
     }
 
     public static @NotNull DifficultyAttribute calculateDifficulty(BeatmapExtended beatmap, List<Mod> mods) {
-        int modBits = 0;
-        for (Mod mod : mods) {
-            modBits |= getModBits(mod);
-        }
-        return calculateDifficulty(beatmap, modBits);
+        return calculateDifficulty(beatmap.getCs(), beatmap.getAccuracy(), beatmap.getAr(), beatmap.getDrain(), mods);
     }
 
     public static @NotNull DifficultyAttribute calculateDifficulty(OsuBeatmap beatmap, long mods) {
@@ -119,6 +123,19 @@ public class BeatmapAnalyzer {
         double hp = beatmap.getDrain();
 
         return calculateDifficulty(cs, od, ar, hp, mods);
+    }
+
+    public static @NotNull DifficultyAttribute calculateDifficulty(double cs, double od, double ar, double hp, List<Mod> mods) {
+        long bits = mods == null ? 0 : mods.stream().mapToLong(OsuParser::getModBits).reduce(0, (a, b) -> a | b);
+        if (mods != null) for (Mod mod : mods) {
+            if (!"DA".equals(mod.getAcronym())) continue;
+            cs = ModSettings.setting(mod, "circle_size", cs);
+            od = ModSettings.setting(mod, "overall_difficulty", od);
+            ar = ModSettings.setting(mod, "approach_rate", ar);
+            hp = ModSettings.setting(mod, "drain_rate", hp);
+        }
+        DifficultyAttribute base = calculateDifficulty(cs, od, ar, hp, bits & ~(64 | 256 | 512));
+        return applyRate(base.cs(), base.od(), base.ar(), base.hp(), ModSettings.clockRate(mods));
     }
 
     public static @NotNull DifficultyAttribute calculateDifficulty(double cs, double od, double ar, double hp, long mods) {
@@ -140,9 +157,6 @@ public class BeatmapAnalyzer {
             hp = hp * 0.5;
         }
 
-        final double originalOd = od;
-        double approachTime = ar >= 5 ? (1200 - 150 * (ar - 5)) : (1800 - 120 * ar);
-
         double clockRate = 1.0;
         if (hasDT || hasNC) {
             clockRate = 1.5;
@@ -150,7 +164,12 @@ public class BeatmapAnalyzer {
             clockRate = 0.75;
         }
 
-        approachTime = approachTime / clockRate;
+        return applyRate(cs, od, ar, hp, clockRate);
+    }
+
+    private static DifficultyAttribute applyRate(double cs, double od, double ar, double hp, double clockRate) {
+        final double originalOd = od;
+        double approachTime = (ar >= 5 ? (1200 - 150 * (ar - 5)) : (1800 - 120 * ar)) / clockRate;
 
         if (approachTime > 1200) {
             ar = (1800 - approachTime) / 120;

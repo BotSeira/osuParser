@@ -1,8 +1,8 @@
 package xyz.zcraft.osu.parser;
 
+import xyz.zcraft.osu.model.ModSettings;
+
 import com.google.gson.Gson;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonParser;
 import desu.life.RosuFFI;
 import org.apache.commons.lang3.tuple.Pair;
 import xyz.zcraft.osu.model.Mod;
@@ -16,22 +16,27 @@ import xyz.zcraft.osu.parser.exception.AnalyzeException;
 
 import java.time.Duration;
 import java.util.Comparator;
-import java.util.LinkedList;
+import java.util.List;
 
 @SuppressWarnings("unused")
 public class OsuParser {
     private static final Gson GSON = new Gson();
 
+    public static RosuFFI.Mods toRosuMods(List<Mod> mods) {
+        return RosuFFI.Mods.fromJson(GSON.toJson(mods == null ? List.of() : mods), RosuFFI.Mode.Osu, true);
+    }
+
     public static DiffSpec getDiffSpecForMap(OsuBeatmap beatmap, String mod) throws AnalyzeException {
+        return getDiffSpecForMods(beatmap, ModSettings.parse(mod));
+    }
+
+    public static DiffSpec getDiffSpecForMods(OsuBeatmap beatmap, List<Mod> modList) throws AnalyzeException {
+        String mod = ModSettings.format(modList);
         try (final RosuFFI.Beatmap rosuBeatmap = new RosuFFI.Beatmap(beatmap.toBeatmapString().getBytes());
-             final RosuFFI.Performance perf = new RosuFFI.Performance()
+             final RosuFFI.Performance perf = new RosuFFI.Performance();
+             final RosuFFI.Mods mods = toRosuMods(modList)
         ) {
             final DiffSpec diffSpec = new DiffSpec();
-
-            final RosuFFI.Mods mods = RosuFFI.Mods.fromAcronyms(mod == null ? "" : mod, RosuFFI.Mode.Osu);
-
-            mods.removeUnknownMods();
-            mods.sanitize();
 
             perf.mods(mods);
 
@@ -73,26 +78,15 @@ public class OsuParser {
                 diffSpec.setModded(true);
             }
 
-            if (mods.contains("DT") || mods.contains("NC")) {
-                diffSpec.setBpm(diffSpec.getBpm() * 1.5);
-                diffSpec.setLength(diffSpec.getLength() / 1.5);
-                diffSpec.setTotalLength(diffSpec.getTotalLength() / 1.5);
-            } else if (mods.contains("HT") || mods.contains("DC")) {
-                diffSpec.setBpm(diffSpec.getBpm() * 0.75);
-                diffSpec.setLength(diffSpec.getLength() / 0.75);
-                diffSpec.setTotalLength(diffSpec.getTotalLength() / 0.75);
-            }
-
-            final LinkedList<Mod> modList = new LinkedList<>();
-
-            for (JsonElement jsonElement : JsonParser.parseString(mods.json()).getAsJsonArray().asList()) {
-                modList.add(GSON.fromJson(jsonElement, Mod.class));
-            }
+            double rate = ModSettings.clockRate(modList);
+            diffSpec.setBpm(diffSpec.getBpm() * rate);
+            diffSpec.setLength(diffSpec.getLength() / rate);
+            diffSpec.setTotalLength(diffSpec.getTotalLength() / rate);
 
             diffSpec.setMods(modList);
             diffSpec.setMaxCombo(scoreState.max_combo);
 
-            diffSpec.setDifficulty(BeatmapAnalyzer.calculateDifficulty(beatmap, mods.bits()));
+            diffSpec.setDifficulty(BeatmapAnalyzer.calculateDifficulty(beatmap, modList));
 
             return diffSpec;
         } catch (Exception e) {
@@ -123,9 +117,10 @@ public class OsuParser {
 
     public static double estimatePp(Score score, OsuBeatmap beatmap) throws AnalyzeException {
         try (final RosuFFI.Beatmap rosuBeatmap = new RosuFFI.Beatmap(beatmap.toBeatmapString().getBytes());
-             final RosuFFI.Performance perf = new RosuFFI.Performance()
+             final RosuFFI.Performance perf = new RosuFFI.Performance();
+             final RosuFFI.Mods mods = toRosuMods(score.getMods())
         ) {
-            perf.mods(RosuFFI.Mods.fromAcronyms(score.getMods().stream().map(Mod::getAcronym).reduce("", String::concat), RosuFFI.Mode.Osu));
+            perf.mods(mods);
 
             perf.accuracy(score.getAccuracy() * 100);
             perf.n300(score.getStatistics().getOrDefault("great", 0L));
@@ -142,7 +137,13 @@ public class OsuParser {
     }
 
     public static WdPerform getHighlight(ReplayAnalyze ra) throws AnalyzeException {
-        return BeatmapAnalyzer.getWindowDifficulties(ra.beatmap(), Duration.ofSeconds(20))
+        List<Mod> mods;
+        if (ra.replay().replayInfo() != null && ra.replay().replayInfo().mods() != null) {
+            mods = ra.replay().replayInfo().mods();
+        } else try (var legacyMods = RosuFFI.Mods.fromBits(ra.replay().mods(), RosuFFI.Mode.Osu)) {
+            mods = java.util.Arrays.asList(GSON.fromJson(legacyMods.json(), Mod[].class));
+        }
+        return BeatmapAnalyzer.getWindowDifficulties(ra.beatmap(), Duration.ofSeconds(20), mods)
                 .stream().map(wd -> calculatePerform(ra, wd))
                 .sorted(Comparator.comparing(WdPerform::wdScore))
                 .toList()

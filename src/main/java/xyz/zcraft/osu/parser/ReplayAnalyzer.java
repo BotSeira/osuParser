@@ -41,7 +41,9 @@ public class ReplayAnalyzer {
 
         final int mods = effectiveLegacyMods(replay);
         final boolean hardRock = (mods & HARD_ROCK_MOD) != 0;
-        final DifficultyAttribute diff = BeatmapAnalyzer.calculateDifficulty(beatmap, mods);
+        final DifficultyAttribute diff = replay.replayInfo() != null && replay.replayInfo().mods() != null
+                ? BeatmapAnalyzer.calculateDifficulty(beatmap, replay.replayInfo().mods())
+                : BeatmapAnalyzer.calculateDifficulty(beatmap, mods);
 
         final double circleRadius = diff.getCircleRadiusInPixel();
         // Frame and object timestamps share the beatmap clock, not wall-clock playback time.
@@ -986,6 +988,15 @@ public class ReplayAnalyzer {
         try (final RosuFFI.Beatmap rosuBeatmap = new RosuFFI.Beatmap(beatmap.toBeatmapString().getBytes());
              final RosuFFI.Mods rosuMods = RosuFFI.Mods.fromBits(modBits, RosuFFI.Mode.Osu)) {
             return calculatePp(rosuBeatmap, rosuMods, state, passedObjects);
+        }
+    }
+
+    public static double calculatePp(OsuBeatmap beatmap, OsuReplay replay, int fallbackBits, PerformanceState state, long passedObjects) {
+        if (replay == null || replay.replayInfo() == null || replay.replayInfo().mods() == null)
+            return calculatePp(beatmap, fallbackBits, state, passedObjects);
+        try (var rosuBeatmap = new RosuFFI.Beatmap(beatmap.toBeatmapString().getBytes());
+             var mods = OsuParser.toRosuMods(replay.replayInfo().mods())) {
+            return calculatePp(rosuBeatmap, mods, state, passedObjects);
         }
     }
 
