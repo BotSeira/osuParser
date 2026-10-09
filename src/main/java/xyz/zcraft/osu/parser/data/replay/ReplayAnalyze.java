@@ -13,4 +13,8 @@ public record ReplayAnalyze(
         double unstableRate,
         double aimUnstableRate
 ) {
+    public List<HitEvent> misses() {
+        return events.stream().filter(HitEvent::isAnalysisMiss)
+                .sorted(java.util.Comparator.comparingLong(HitEvent::analysisTime)).toList();
+    }
 }

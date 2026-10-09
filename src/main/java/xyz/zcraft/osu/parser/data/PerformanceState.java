@@ -34,8 +34,7 @@ public class PerformanceState {
             boolean hit = event.wasHit();
 
             if (replaceMissWith300
-                    && event.isObjectStart()
-                    && event.hitResult() == HitEvent.HitResult.MISS) {
+                    && !event.wasHit()) {
                 hit = true;
             }
 
