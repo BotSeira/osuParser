@@ -41,7 +41,7 @@ public class PerformanceState {
             if (hit) {
                 currentCombo++;
                 maxCombo = Math.max(maxCombo, currentCombo);
-            } else {
+            } else if (event.eventType() != HitEvent.EventType.SLIDER_END) {
                 currentCombo = 0;
             }
         }

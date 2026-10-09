@@ -43,7 +43,7 @@ public record HitEvent(
     /** Failed playable events used by miss inspection, including slider breaks. */
     public boolean isAnalysisMiss() {
         return !wasHit && switch (eventType) {
-            case HIT_CIRCLE, SLIDER_HEAD, SLIDER_TICK, SLIDER_END -> true;
+            case HIT_CIRCLE, SLIDER_HEAD, SLIDER_TICK -> true;
             default -> false;
         };
     }
