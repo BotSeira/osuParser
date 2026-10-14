@@ -14,6 +14,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 public class BeatmapParser {
     public static OsuBeatmap parseBeatmap(Path beatmapPath) throws ParseException {
@@ -286,8 +287,16 @@ class BeatmapFileParser {
         try {
             return Long.parseLong(value.trim());
         } catch (NumberFormatException e) {
-            return null;
+            // Ignoring
         }
+
+        try {
+            return (long) Double.parseDouble(value.trim());
+        } catch (NumberFormatException e) {
+            // Ignoring
+        }
+
+        return null;
     }
 
     private static Integer parseIntSafe(String value) {
@@ -295,8 +304,16 @@ class BeatmapFileParser {
         try {
             return Integer.parseInt(value.trim());
         } catch (NumberFormatException e) {
-            return null;
+            // Ignoring
         }
+
+        try {
+            return (int) Double.parseDouble(value.trim());
+        } catch (NumberFormatException e) {
+            // Ignoring
+        }
+
+        return null;
     }
 
     private static Double parseDoubleSafe(String value) {
@@ -313,7 +330,7 @@ class BeatmapFileParser {
             final String[] split = value.split(",");
             final ArrayList<Long> values = new ArrayList<>();
             for (String s : split) {
-                values.add(Long.parseLong(s));
+                values.add(Objects.requireNonNull(parseLongSafe(s)));
             }
             return values;
         } catch (Exception e) {
