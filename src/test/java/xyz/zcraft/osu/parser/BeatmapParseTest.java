@@ -51,4 +51,13 @@ public class BeatmapParseTest {
 
         assertEquals(5.38, diff.getStar(), 0.01);
     }
+
+    @Test
+    void parseTest() throws Exception {
+        for (Integer i : List.of(166, 1566, 14648, 18584, 25121, 86324, 93842, 95431, 100392, 1056889)) {
+            System.out.println("Parsing beatmap " + i);
+            Path beatmapPath = getRes("beatmaps/" + i + ".osu");
+            BeatmapParser.parseBeatmap(beatmapPath);
+        }
+    }
 }

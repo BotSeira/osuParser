@@ -265,12 +265,12 @@ class BeatmapFileParser {
                 new OsuBeatmap.TimingPoint(
                         parseLongSafe(split[0]),
                         parseDoubleSafe(split[1]),
-                        parseIntSafe(split[2]),
-                        parseIntSafe(split[3]),
-                        parseIntSafe(split[4]),
-                        parseIntSafe(split[5]),
-                        parseIntSafe(split[6]),
-                        parseIntSafe(split[7])
+                        parseIntSafe(split, 2, 0),
+                        parseIntSafe(split, 3, 0),
+                        parseIntSafe(split, 4, 0),
+                        parseIntSafe(split, 5, 0),
+                        parseIntSafe(split, 6, 0),
+                        parseIntSafe(split, 7, 0)
                 ));
     }
 
@@ -300,6 +300,26 @@ class BeatmapFileParser {
     }
 
     private static Integer parseIntSafe(String value) {
+        if (value == null) return null;
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException e) {
+            // Ignoring
+        }
+
+        try {
+            return (int) Double.parseDouble(value.trim());
+        } catch (NumberFormatException e) {
+            // Ignoring
+        }
+
+        return null;
+    }
+
+    private static Integer parseIntSafe(String[] arr, int idx, Integer fallback) {
+        if (arr == null) return null;
+        if (idx < 0 || idx >= arr.length) return fallback;
+        String value = arr[idx];
         if (value == null) return null;
         try {
             return Integer.parseInt(value.trim());
