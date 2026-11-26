@@ -2,7 +2,7 @@ package xyz.zcraft.osu.parser;
 
 import org.junit.jupiter.api.Test;
 import xyz.zcraft.osu.parser.data.beatmap.BeatmapPatternAnalysis;
-import xyz.zcraft.osu.parser.data.beatmap.DifficultyAttribute;
+import xyz.zcraft.osu.parser.data.beatmap.BeatmapAttributes;
 import xyz.zcraft.osu.parser.data.beatmap.HitObject;
 import xyz.zcraft.osu.parser.data.beatmap.OsuBeatmap;
 
@@ -15,7 +15,7 @@ import static xyz.zcraft.osu.parser.data.beatmap.BeatmapPatternAnalysis.AimPatte
 import static xyz.zcraft.osu.parser.data.beatmap.BeatmapPatternAnalysis.PatternType.*;
 
 class BeatmapPatternAnalyzerTest {
-    private static final DifficultyAttribute NORMAL = new DifficultyAttribute(4, 8, 9, 6, 8, 1);
+    private static final BeatmapAttributes NORMAL = new BeatmapAttributes(4, 8, 9, 6, 8, 1);
 
     private static OsuBeatmap map(double ar) {
         OsuBeatmap map = new OsuBeatmap();
@@ -89,7 +89,7 @@ class BeatmapPatternAnalyzerTest {
         for (int index = 0; index < times.length; index++) {
             map.getHitObjects().add(circle(times[index], 256 + index % 2 * 8, 192 + index % 3 * 5));
         }
-        DifficultyAttribute lowAr = new DifficultyAttribute(4, 7, 5, 6, 7, 1);
+        BeatmapAttributes lowAr = new BeatmapAttributes(4, 7, 5, 6, 7, 1);
 
         BeatmapPatternAnalysis analysis = BeatmapPatternAnalyzer.analyze(map, lowAr);
 

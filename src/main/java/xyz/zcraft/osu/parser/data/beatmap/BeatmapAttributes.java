@@ -1,6 +1,6 @@
 package xyz.zcraft.osu.parser.data.beatmap;
 
-public record DifficultyAttribute(
+public record BeatmapAttributes(
         double cs,
         double od,
         double ar,

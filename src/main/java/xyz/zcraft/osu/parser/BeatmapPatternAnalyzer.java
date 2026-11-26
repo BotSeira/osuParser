@@ -1,7 +1,7 @@
 package xyz.zcraft.osu.parser;
 
 import xyz.zcraft.osu.parser.data.beatmap.BeatmapPatternAnalysis;
-import xyz.zcraft.osu.parser.data.beatmap.DifficultyAttribute;
+import xyz.zcraft.osu.parser.data.beatmap.BeatmapAttributes;
 import xyz.zcraft.osu.parser.data.beatmap.HitObject;
 import xyz.zcraft.osu.parser.data.beatmap.OsuBeatmap;
 
@@ -24,7 +24,7 @@ public final class BeatmapPatternAnalyzer {
     private BeatmapPatternAnalyzer() {
     }
 
-    public static BeatmapPatternAnalysis analyze(OsuBeatmap beatmap, DifficultyAttribute difficulty) {
+    public static BeatmapPatternAnalysis analyze(OsuBeatmap beatmap, BeatmapAttributes difficulty) {
         if (beatmap == null) throw new IllegalArgumentException("beatmap must not be null");
 
         List<HitObject> objects = beatmap.getHitObjects() == null

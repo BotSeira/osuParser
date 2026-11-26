@@ -16,7 +16,7 @@ public final class DiffSpec implements Serializable {
     private double speed;
     private double reading;
 
-    private DifficultyAttribute difficulty;
+    private BeatmapAttributes difficulty;
     private double star;
     private double bpm;
     private String modStr;

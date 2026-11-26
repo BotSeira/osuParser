@@ -9,7 +9,7 @@ import org.jetbrains.annotations.NotNull;
 import xyz.zcraft.osu.model.BeatmapExtended;
 import xyz.zcraft.osu.model.Mod;
 import xyz.zcraft.osu.model.Score;
-import xyz.zcraft.osu.parser.data.beatmap.DifficultyAttribute;
+import xyz.zcraft.osu.parser.data.beatmap.BeatmapAttributes;
 import xyz.zcraft.osu.parser.data.beatmap.HitObject;
 import xyz.zcraft.osu.parser.data.beatmap.OsuBeatmap;
 import xyz.zcraft.osu.parser.data.beatmap.WindowDifficulty;
@@ -95,19 +95,19 @@ public class BeatmapAnalyzer {
         return beatmap.getHitObjects().stream().map(HitObject::getTime).toList();
     }
 
-    public static @NotNull DifficultyAttribute calculateDifficulty(Score score) {
+    public static @NotNull BeatmapAttributes calculateDifficulty(Score score) {
         return calculateDifficulty(score.getBeatmap(), score.getMods());
     }
 
-    public static @NotNull DifficultyAttribute calculateDifficulty(OsuBeatmap beatmap, List<Mod> mods) {
+    public static @NotNull BeatmapAttributes calculateDifficulty(OsuBeatmap beatmap, List<Mod> mods) {
         return calculateDifficulty(beatmap.getCs(), beatmap.getOd(), beatmap.getAr(), beatmap.getHp(), mods);
     }
 
-    public static @NotNull DifficultyAttribute calculateDifficulty(BeatmapExtended beatmap, List<Mod> mods) {
+    public static @NotNull BeatmapAttributes calculateDifficulty(BeatmapExtended beatmap, List<Mod> mods) {
         return calculateDifficulty(beatmap.getCs(), beatmap.getAccuracy(), beatmap.getAr(), beatmap.getDrain(), mods);
     }
 
-    public static @NotNull DifficultyAttribute calculateDifficulty(OsuBeatmap beatmap, long mods) {
+    public static @NotNull BeatmapAttributes calculateDifficulty(OsuBeatmap beatmap, long mods) {
         double cs = beatmap.getCs();
         double od = beatmap.getOd();
         double ar = beatmap.getAr();
@@ -116,7 +116,7 @@ public class BeatmapAnalyzer {
         return calculateDifficulty(cs, od, ar, hp, mods);
     }
 
-    public static @NotNull DifficultyAttribute calculateDifficulty(BeatmapExtended beatmap, long mods) {
+    public static @NotNull BeatmapAttributes calculateDifficulty(BeatmapExtended beatmap, long mods) {
         double cs = beatmap.getCs();
         double od = beatmap.getAccuracy();
         double ar = beatmap.getAr();
@@ -125,7 +125,7 @@ public class BeatmapAnalyzer {
         return calculateDifficulty(cs, od, ar, hp, mods);
     }
 
-    public static @NotNull DifficultyAttribute calculateDifficulty(double cs, double od, double ar, double hp, List<Mod> mods) {
+    public static @NotNull BeatmapAttributes calculateDifficulty(double cs, double od, double ar, double hp, List<Mod> mods) {
         long bits = mods == null ? 0 : mods.stream().mapToLong(OsuParser::getModBits).reduce(0, (a, b) -> a | b);
         if (mods != null) for (Mod mod : mods) {
             if (!"DA".equals(mod.getAcronym())) continue;
@@ -134,11 +134,11 @@ public class BeatmapAnalyzer {
             ar = ModSettings.setting(mod, "approach_rate", ar);
             hp = ModSettings.setting(mod, "drain_rate", hp);
         }
-        DifficultyAttribute base = calculateDifficulty(cs, od, ar, hp, bits & ~(64 | 256 | 512));
+        BeatmapAttributes base = calculateDifficulty(cs, od, ar, hp, bits & ~(64 | 256 | 512));
         return applyRate(base.cs(), base.od(), base.ar(), base.hp(), ModSettings.clockRate(mods));
     }
 
-    public static @NotNull DifficultyAttribute calculateDifficulty(double cs, double od, double ar, double hp, long mods) {
+    public static @NotNull BeatmapAttributes calculateDifficulty(double cs, double od, double ar, double hp, long mods) {
         boolean hasEZ = (mods & 2) > 0;
         boolean hasHR = (mods & 16) > 0;
         boolean hasDT = (mods & 64) > 0;
@@ -167,7 +167,7 @@ public class BeatmapAnalyzer {
         return applyRate(cs, od, ar, hp, clockRate);
     }
 
-    private static DifficultyAttribute applyRate(double cs, double od, double ar, double hp, double clockRate) {
+    private static BeatmapAttributes applyRate(double cs, double od, double ar, double hp, double clockRate) {
         final double originalOd = od;
         double approachTime = (ar >= 5 ? (1200 - 150 * (ar - 5)) : (1800 - 120 * ar)) / clockRate;
 
@@ -180,7 +180,7 @@ public class BeatmapAnalyzer {
         double window = (80.0 - (6.0 * od)) / clockRate;
         od = (80.0 - window) / 6;
 
-        return new DifficultyAttribute(cs, od, ar, hp, originalOd, clockRate);
+        return new BeatmapAttributes(cs, od, ar, hp, originalOd, clockRate);
     }
 
     public static double calculateBpm(OsuBeatmap beatmap) {

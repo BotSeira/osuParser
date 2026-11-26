@@ -1,12 +1,13 @@
 package xyz.zcraft.osu.parser;
 
-import xyz.zcraft.osu.model.ModSettings;
-
 import com.google.gson.Gson;
 import desu.life.RosuFFI;
 import org.apache.commons.lang3.tuple.Pair;
 import xyz.zcraft.osu.model.Mod;
+import xyz.zcraft.osu.model.ModSettings;
 import xyz.zcraft.osu.model.Score;
+import xyz.zcraft.osu.parser.data.beatmap.DifficultyAttributes;
+import xyz.zcraft.osu.parser.data.PerformanceAttributes;
 import xyz.zcraft.osu.parser.data.beatmap.DiffSpec;
 import xyz.zcraft.osu.parser.data.beatmap.OsuBeatmap;
 import xyz.zcraft.osu.parser.data.beatmap.WindowDifficulty;
@@ -116,6 +117,10 @@ public class OsuParser {
     }
 
     public static double estimatePp(Score score, OsuBeatmap beatmap) throws AnalyzeException {
+        return getScorePerfAttr(score, beatmap).pp();
+    }
+
+    public static PerformanceAttributes getScorePerfAttr(Score score, OsuBeatmap beatmap) throws AnalyzeException {
         try (final RosuFFI.Beatmap rosuBeatmap = new RosuFFI.Beatmap(beatmap.toBeatmapString().getBytes());
              final RosuFFI.Performance perf = new RosuFFI.Performance();
              final RosuFFI.Mods mods = toRosuMods(score.getMods())
@@ -130,9 +135,37 @@ public class OsuParser {
 
             var calc = perf.calculate(rosuBeatmap);
 
-            return calc.asOsu().pp;
+            final RosuFFI.OsuPerformanceAttributes rosu = calc.asOsu();
+
+            return new PerformanceAttributes(
+                    rosu.pp_aim, rosu.pp_speed, rosu.pp_acc, rosu.pp_flashlight, rosu.pp_reading,
+                    rosu.effective_miss_count, rosu.speed_deviation.some, rosu.combo_based_estimated_miss_count,
+                    rosu.score_based_estimated_miss_count.some, rosu.aim_estimated_slider_breaks, rosu.speed_estimated_slider_breaks,
+                    rosu.pp
+            );
         } catch (RosuFFI.FFIException e) {
-            throw new AnalyzeException("Failed to calculate PP", e);
+            throw new AnalyzeException("Failed to calculate ScorePerfAttr", e);
+        }
+    }
+
+    public static DifficultyAttributes getBeatmapDiffAttr(OsuBeatmap beatmap, List<Mod> modList) throws AnalyzeException {
+        try (final RosuFFI.Beatmap rosuBeatmap = new RosuFFI.Beatmap(beatmap.toBeatmapString().getBytes());
+             final RosuFFI.Difficulty diff = new RosuFFI.Difficulty();
+             final RosuFFI.Mods mods = toRosuMods(modList)
+        ) {
+            diff.mods(mods);
+            final var calc = diff.calculate(rosuBeatmap);
+            final var rosu = calc.asOsu();
+
+            return new DifficultyAttributes(
+                    rosu.stars, rosu.max_combo, rosu.aim, rosu.aim_difficult_slider_count,
+                    rosu.speed, rosu.speed_note_count, rosu.reading, rosu.slider_factor,
+                    rosu.aim_top_weighted_slider_factor, rosu.speed_top_weighted_slider_factor, rosu.aim_difficult_strain_count,
+                    rosu.speed_difficult_strain_count, rosu.reading_difficult_note_count, rosu.nested_score_per_object,
+                    rosu.legacy_score_base_multiplier, rosu.maximum_legacy_combo_score
+            );
+        } catch (RosuFFI.FFIException e) {
+            throw new AnalyzeException("Failed to calculate BeatmapDiffAttr", e);
         }
     }
 

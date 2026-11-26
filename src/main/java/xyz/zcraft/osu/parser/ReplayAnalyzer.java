@@ -2,7 +2,7 @@ package xyz.zcraft.osu.parser;
 
 import desu.life.RosuFFI;
 import xyz.zcraft.osu.parser.data.PerformanceState;
-import xyz.zcraft.osu.parser.data.beatmap.DifficultyAttribute;
+import xyz.zcraft.osu.parser.data.beatmap.BeatmapAttributes;
 import xyz.zcraft.osu.parser.data.beatmap.HitObject;
 import xyz.zcraft.osu.parser.data.beatmap.OsuBeatmap;
 import xyz.zcraft.osu.parser.data.replay.HitEvent;
@@ -41,7 +41,7 @@ public class ReplayAnalyzer {
 
         final int mods = effectiveLegacyMods(replay);
         final boolean hardRock = (mods & HARD_ROCK_MOD) != 0;
-        final DifficultyAttribute diff = replay.replayInfo() != null && replay.replayInfo().mods() != null
+        final BeatmapAttributes diff = replay.replayInfo() != null && replay.replayInfo().mods() != null
                 ? BeatmapAnalyzer.calculateDifficulty(beatmap, replay.replayInfo().mods())
                 : BeatmapAnalyzer.calculateDifficulty(beatmap, mods);
 
@@ -262,7 +262,7 @@ public class ReplayAnalyzer {
 
     private static List<HitEvent> analyzeSpinner(HitObject spinner, int objectIndex,
                                                  List<OsuReplay.TimedKeyFrame> keyFrames,
-                                                 DifficultyAttribute difficulty, int mods,
+                                                 BeatmapAttributes difficulty, int mods,
                                                  boolean hardRock) {
         long startTime = spinner.getTime();
         long endTime = Math.max(startTime, spinner.getEndTime());
@@ -941,7 +941,7 @@ public class ReplayAnalyzer {
         return score / (totalHits * 300.0);
     }
 
-    private static HitEvent.HitResult windowAccuracyResult(HitEvent event, DifficultyAttribute difficulty) {
+    private static HitEvent.HitResult windowAccuracyResult(HitEvent event, BeatmapAttributes difficulty) {
         if (!event.wasHit() || event.eventType() == HitEvent.EventType.SPINNER) return event.hitResult();
 
         double absoluteOffset = Math.abs(event.hitTimeOffset()) / difficulty.clockRate();
